@@ -1,0 +1,1253 @@
+openapi: 3.1.0
+
+info:
+  title: TemuKan API
+  version: 1.0.0
+  description: |
+    API untuk platform TemuKan — menghubungkan penemu orang terlantar,
+    keluarga pencari, dan relawan/NGO di Indonesia.
+
+    ## Autentikasi
+    API ini menggunakan JWT dengan strategi berbeda per client:
+
+    | Client | Cara kirim token | Set via |
+    |--------|-----------------|---------|
+    | **Web** | Cookie `access_token` (httpOnly) | Di-set otomatis server |
+    | **Mobile** | Header `Authorization: Bearer <token>` | Dari response body |
+
+    Bedakan client dengan mengirim header **`X-Client-Type: web`** atau **`X-Client-Type: mobile`**
+    di setiap request. Default: `web`.
+
+    ## Response Format
+    Semua response menggunakan envelope yang konsisten:
+    ```json
+    {
+      "success": true,
+      "message": "Pesan untuk user",
+      "data": { ... }
+    }
+    ```
+    Error:
+    ```json
+    {
+      "success": false,
+      "message": "Pesan error untuk user",
+      "error": "internal_error_code"
+    }
+    ```
+
+servers:
+  - url: http://localhost:8080/api/v1
+    description: Local development
+  - url: https://api.temukan.id/api/v1
+    description: Production (TBD)
+
+tags:
+  - name: Auth
+    description: Register, login, logout, refresh token
+  - name: Reports
+    description: CRUD laporan orang hilang & ditemukan
+  - name: Map
+    description: Data laporan untuk tampilan peta
+  - name: Matches
+    description: Hasil matching otomatis antar laporan
+  - name: Notifications
+    description: Notifikasi untuk user
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# COMPONENTS (single, merged)
+# ═══════════════════════════════════════════════════════════════════════════════
+components:
+
+  # ── Security Schemes ────────────────────────────────────────────────────────
+  securitySchemes:
+    BearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: Digunakan oleh client mobile via header Authorization
+    CookieAuth:
+      type: apiKey
+      in: cookie
+      name: access_token
+      description: Digunakan oleh client web via httpOnly cookie
+
+  # ── Reusable Parameters ─────────────────────────────────────────────────────
+  parameters:
+    XClientType:
+      name: X-Client-Type
+      in: header
+      required: false
+      schema:
+        type: string
+        enum: [web, mobile]
+        default: web
+      description: Tipe client. Menentukan cara token dikembalikan.
+
+    ReportId:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+      description: UUID laporan
+
+    PageParam:
+      name: page
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+
+    LimitParam:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 10
+
+  # ── Reusable Responses ──────────────────────────────────────────────────────
+  responses:
+    Unauthorized:
+      description: Token tidak valid atau belum login
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            message: Silakan login terlebih dahulu
+            error: unauthorized
+
+    Forbidden:
+      description: Tidak punya akses ke resource ini
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            message: Anda tidak memiliki akses ke laporan ini
+            error: forbidden
+
+    NotFound:
+      description: Resource tidak ditemukan
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            success: false
+            message: Data tidak ditemukan
+            error: not_found
+
+  # ── Reusable Schemas ────────────────────────────────────────────────────────
+  schemas:
+
+    # ── Generic Responses ────────────────────────────────────────────────────
+    SuccessResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Berhasil
+
+    ErrorResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: false
+        message:
+          type: string
+          example: Terjadi kesalahan
+        error:
+          type: string
+          example: validation_error
+
+    PaginationMeta:
+      type: object
+      properties:
+        total:
+          type: integer
+          example: 100
+        page:
+          type: integer
+          example: 1
+        limit:
+          type: integer
+          example: 10
+        total_pages:
+          type: integer
+          example: 10
+
+    # ── Auth ─────────────────────────────────────────────────────────────────
+    RegisterRequest:
+      type: object
+      required: [name, email, password, role]
+      properties:
+        name:
+          type: string
+          minLength: 2
+          maxLength: 255
+          example: Budi Santoso
+        email:
+          type: string
+          format: email
+          example: budi@email.com
+        password:
+          type: string
+          minLength: 8
+          example: password123
+        role:
+          type: string
+          enum: [finder, seeker, volunteer]
+          example: seeker
+        phone:
+          type: string
+          example: "08123456789"
+
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          example: budi@email.com
+        password:
+          type: string
+          example: password123
+
+    AuthResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+          example: true
+        message:
+          type: string
+          example: Login berhasil
+        data:
+          type: object
+          properties:
+            user:
+              $ref: '#/components/schemas/UserProfile'
+            tokens:
+              description: |
+                Hanya ada di response jika X-Client-Type = mobile.
+                Untuk web, token di-set via httpOnly cookie.
+              $ref: '#/components/schemas/TokenPair'
+
+    TokenPair:
+      type: object
+      properties:
+        access_token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIs...
+        refresh_token:
+          type: string
+          example: eyJhbGciOiJIUzI1NiIs...
+        expires_in:
+          type: integer
+          description: Detik sampai access_token expired
+          example: 259200
+
+    RefreshRequest:
+      type: object
+      required: [refresh_token]
+      properties:
+        refresh_token:
+          type: string
+          description: Wajib dikirim untuk client mobile. Web otomatis baca dari cookie.
+          example: eyJhbGciOiJIUzI1NiIs...
+
+    UserProfile:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 550e8400-e29b-41d4-a716-446655440000
+        name:
+          type: string
+          example: Budi Santoso
+        email:
+          type: string
+          example: budi@email.com
+        role:
+          type: string
+          enum: [finder, seeker, volunteer]
+          example: seeker
+        phone:
+          type: string
+          nullable: true
+          example: "08123456789"
+        created_at:
+          type: string
+          format: date-time
+
+    # ── Reports ──────────────────────────────────────────────────────────────
+    CreateReportRequest:
+      type: object
+      required: [type, gender, estimated_age, description, last_seen_location, city, province]
+      properties:
+        type:
+          type: string
+          enum: [found, missing]
+          example: missing
+          description: "`found` = penemu, `missing` = pencari"
+        name:
+          type: string
+          nullable: true
+          example: Pak Rudi
+          description: Nama orang. Boleh kosong jika tidak diketahui.
+        gender:
+          type: string
+          enum: [male, female, unknown]
+          example: male
+        estimated_age:
+          type: integer
+          minimum: 0
+          maximum: 120
+          example: 65
+        description:
+          type: string
+          minLength: 10
+          example: "Pria tua, rambut putih, pakai baju batik biru, terlihat kebingungan"
+        last_seen_location:
+          type: string
+          example: "Depan Pasar Petisah, Jalan Pegadaian"
+        city:
+          type: string
+          example: Medan
+        province:
+          type: string
+          example: Sumatera Utara
+        latitude:
+          type: number
+          format: double
+          nullable: true
+          example: 3.5952
+        longitude:
+          type: number
+          format: double
+          nullable: true
+          example: 98.6722
+
+    UpdateReportRequest:
+      type: object
+      properties:
+        name:
+          type: string
+          nullable: true
+        gender:
+          type: string
+          enum: [male, female, unknown]
+        estimated_age:
+          type: integer
+          minimum: 0
+          maximum: 120
+        description:
+          type: string
+        last_seen_location:
+          type: string
+        city:
+          type: string
+        province:
+          type: string
+        latitude:
+          type: number
+          format: double
+          nullable: true
+        longitude:
+          type: number
+          format: double
+          nullable: true
+        status:
+          type: string
+          enum: [active, resolved]
+
+    Report:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          example: 550e8400-e29b-41d4-a716-446655440001
+        reporter_id:
+          type: string
+          format: uuid
+        reporter:
+          $ref: '#/components/schemas/UserProfile'
+        type:
+          type: string
+          enum: [found, missing]
+        name:
+          type: string
+          nullable: true
+        gender:
+          type: string
+          enum: [male, female, unknown]
+        estimated_age:
+          type: integer
+          nullable: true
+        photo_url:
+          type: string
+          nullable: true
+          example: https://res.cloudinary.com/temukan/image/upload/v1/reports/abc.jpg
+        description:
+          type: string
+        last_seen_location:
+          type: string
+        city:
+          type: string
+        province:
+          type: string
+        latitude:
+          type: number
+          format: double
+          nullable: true
+        longitude:
+          type: number
+          format: double
+          nullable: true
+        status:
+          type: string
+          enum: [active, resolved]
+        whatsapp_share_url:
+          type: string
+          description: URL siap pakai untuk share ke WhatsApp
+          example: "https://wa.me/?text=..."
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    ReportListResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        data:
+          type: object
+          properties:
+            reports:
+              type: array
+              items:
+                $ref: '#/components/schemas/Report'
+            meta:
+              $ref: '#/components/schemas/PaginationMeta'
+
+    # ── Map ──────────────────────────────────────────────────────────────────
+    MapPin:
+      type: object
+      description: Data minimal untuk render pin di peta (performa lebih ringan)
+      properties:
+        id:
+          type: string
+          format: uuid
+        type:
+          type: string
+          enum: [found, missing]
+        gender:
+          type: string
+          enum: [male, female, unknown]
+        estimated_age:
+          type: integer
+          nullable: true
+        city:
+          type: string
+        latitude:
+          type: number
+          format: double
+        longitude:
+          type: number
+          format: double
+        photo_url:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+    # ── Matches ──────────────────────────────────────────────────────────────
+    Match:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        score:
+          type: integer
+          minimum: 0
+          maximum: 100
+          example: 80
+          description: "Skor: lokasi(40) + gender(30) + usia(20) + fisik(10)"
+        found_report:
+          $ref: '#/components/schemas/Report'
+        missing_report:
+          $ref: '#/components/schemas/Report'
+        notified:
+          type: boolean
+        created_at:
+          type: string
+          format: date-time
+
+    # ── Notifications ─────────────────────────────────────────────────────────
+    Notification:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+        message:
+          type: string
+          example: "Ditemukan kemungkinan kecocokan untuk laporan Anda (skor: 80)"
+        is_read:
+          type: boolean
+        report_id:
+          type: string
+          format: uuid
+          nullable: true
+        match_id:
+          type: string
+          format: uuid
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+
+# ═══════════════════════════════════════════════════════════════════════════════
+# PATHS
+# ═══════════════════════════════════════════════════════════════════════════════
+paths:
+
+  # ── AUTH ────────────────────────────────────────────────────────────────────
+  /auth/register:
+    post:
+      tags: [Auth]
+      summary: Daftar akun baru
+      parameters:
+        - $ref: '#/components/parameters/XClientType'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RegisterRequest'
+      responses:
+        '201':
+          description: Registrasi berhasil
+          headers:
+            Set-Cookie:
+              description: |
+                Hanya ada jika X-Client-Type=web.
+                `access_token=...; HttpOnly; Secure; SameSite=Strict`
+                `refresh_token=...; HttpOnly; Secure; SameSite=Strict`
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+              examples:
+                web:
+                  summary: Response untuk web (token di cookie)
+                  value:
+                    success: true
+                    message: Registrasi berhasil
+                    data:
+                      user:
+                        id: 550e8400-e29b-41d4-a716-446655440000
+                        name: Budi Santoso
+                        email: budi@email.com
+                        role: seeker
+                mobile:
+                  summary: Response untuk mobile (token di body)
+                  value:
+                    success: true
+                    message: Registrasi berhasil
+                    data:
+                      user:
+                        id: 550e8400-e29b-41d4-a716-446655440000
+                        name: Budi Santoso
+                        email: budi@email.com
+                        role: seeker
+                      tokens:
+                        access_token: eyJhbGciOiJIUzI1NiIs...
+                        refresh_token: eyJhbGciOiJIUzI1NiIs...
+                        expires_in: 259200
+        '400':
+          description: Validasi gagal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: Format email tidak valid
+                error: validation_error
+        '409':
+          description: Email sudah terdaftar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: Email sudah terdaftar
+                error: email_already_exists
+
+  /auth/login:
+    post:
+      tags: [Auth]
+      summary: Login
+      parameters:
+        - $ref: '#/components/parameters/XClientType'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Login berhasil
+          headers:
+            Set-Cookie:
+              description: Hanya ada jika X-Client-Type=web
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '401':
+          description: Email atau password salah
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: Email atau password salah
+                error: invalid_credentials
+
+  /auth/refresh:
+    post:
+      tags: [Auth]
+      summary: Refresh access token
+      description: |
+        - **Web**: refresh_token dibaca otomatis dari cookie. Body bisa kosong.
+        - **Mobile**: kirim `refresh_token` di request body.
+      parameters:
+        - $ref: '#/components/parameters/XClientType'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/RefreshRequest'
+      responses:
+        '200':
+          description: Token berhasil diperbarui
+          headers:
+            Set-Cookie:
+              description: Hanya ada jika X-Client-Type=web (set access_token baru)
+              schema:
+                type: string
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                  data:
+                    $ref: '#/components/schemas/TokenPair'
+        '401':
+          description: Refresh token tidak valid atau expired
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: Sesi telah berakhir, silakan login kembali
+                error: refresh_token_expired
+
+  /auth/logout:
+    post:
+      tags: [Auth]
+      summary: Logout
+      description: |
+        - **Web**: menghapus cookie access_token & refresh_token.
+        - **Mobile**: cukup hapus token dari storage lokal. Endpoint ini tetap bisa dipanggil untuk blacklist token di server.
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/XClientType'
+      responses:
+        '200':
+          description: Logout berhasil
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              example:
+                success: true
+                message: Logout berhasil
+
+  /auth/me:
+    get:
+      tags: [Auth]
+      summary: Ambil profil user yang sedang login
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: Data profil user
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/UserProfile'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  # ── REPORTS ─────────────────────────────────────────────────────────────────
+  /reports:
+    get:
+      tags: [Reports]
+      summary: List semua laporan (dengan filter & pagination)
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [found, missing]
+          description: Filter berdasarkan jenis laporan
+        - name: status
+          in: query
+          schema:
+            type: string
+            enum: [active, resolved]
+            default: active
+        - name: city
+          in: query
+          schema:
+            type: string
+          example: Medan
+        - name: province
+          in: query
+          schema:
+            type: string
+          example: Sumatera Utara
+        - name: gender
+          in: query
+          schema:
+            type: string
+            enum: [male, female, unknown]
+        - name: age_min
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+          example: 50
+        - name: age_max
+          in: query
+          schema:
+            type: integer
+            maximum: 120
+          example: 70
+        - name: q
+          in: query
+          description: Full-text search di deskripsi & nama
+          schema:
+            type: string
+          example: batik biru
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: List laporan berhasil diambil
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportListResponse'
+
+    post:
+      tags: [Reports]
+      summary: Buat laporan baru
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateReportRequest'
+      responses:
+        '201':
+          description: Laporan berhasil dibuat
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                    example: Laporan berhasil dibuat
+                  data:
+                    $ref: '#/components/schemas/Report'
+        '400':
+          description: Validasi gagal
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /reports/my:
+    get:
+      tags: [Reports]
+      summary: List laporan milik user yang sedang login
+      description: |
+        **Penting**: path `/reports/my` harus didefinisikan **sebelum** `/reports/{id}`
+        agar router tidak salah mengira "my" sebagai UUID.
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: List laporan milik saya
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ReportListResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /reports/{id}:
+    get:
+      tags: [Reports]
+      summary: Detail satu laporan
+      parameters:
+        - $ref: '#/components/parameters/ReportId'
+      responses:
+        '200':
+          description: Detail laporan
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/Report'
+        '404':
+          description: Laporan tidak ditemukan
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: Laporan tidak ditemukan
+                error: report_not_found
+
+    put:
+      tags: [Reports]
+      summary: Update laporan (hanya oleh pelapor)
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ReportId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateReportRequest'
+      responses:
+        '200':
+          description: Laporan berhasil diupdate
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                    example: Laporan berhasil diperbarui
+                  data:
+                    $ref: '#/components/schemas/Report'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+    delete:
+      tags: [Reports]
+      summary: Hapus laporan (hanya oleh pelapor)
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ReportId'
+      responses:
+        '200':
+          description: Laporan berhasil dihapus
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              example:
+                success: true
+                message: Laporan berhasil dihapus
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /reports/{id}/photo:
+    post:
+      tags: [Reports]
+      summary: Upload foto laporan ke Cloudinary
+      description: |
+        Upload menggunakan `multipart/form-data`.
+        Maksimal ukuran file: **5MB**.
+        Format yang didukung: jpg, jpeg, png, webp.
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - $ref: '#/components/parameters/ReportId'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [photo]
+              properties:
+                photo:
+                  type: string
+                  format: binary
+      responses:
+        '200':
+          description: Foto berhasil diupload
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+                    example: Foto berhasil diupload
+                  data:
+                    type: object
+                    properties:
+                      photo_url:
+                        type: string
+                        example: https://res.cloudinary.com/temukan/image/upload/v1/reports/abc.jpg
+        '400':
+          description: File tidak valid
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: Format file tidak didukung. Gunakan jpg, png, atau webp.
+                error: invalid_file_format
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '413':
+          description: Ukuran file terlalu besar
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+              example:
+                success: false
+                message: Ukuran file maksimal 5MB
+                error: file_too_large
+
+  # ── MAP ─────────────────────────────────────────────────────────────────────
+  /map/pins:
+    get:
+      tags: [Map]
+      summary: Ambil semua pin laporan aktif untuk peta
+      description: |
+        Endpoint ringan khusus untuk Leaflet.js.
+        Hanya mengembalikan field yang diperlukan untuk render pin di peta.
+        Tidak memerlukan autentikasi (publik).
+      parameters:
+        - name: type
+          in: query
+          schema:
+            type: string
+            enum: [found, missing]
+          description: Filter jenis laporan (kosong = tampilkan semua)
+        - name: bounds
+          in: query
+          description: |
+            Batasi area peta. Format: `lat_min,lng_min,lat_max,lng_max`
+            Contoh: `3.4,98.5,3.7,98.8`
+          schema:
+            type: string
+          example: "3.4,98.5,3.7,98.8"
+      responses:
+        '200':
+          description: List pin berhasil diambil
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      pins:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/MapPin'
+                      total:
+                        type: integer
+                        example: 42
+
+  # ── MATCHES ─────────────────────────────────────────────────────────────────
+  /matches:
+    get:
+      tags: [Matches]
+      summary: List hasil matching untuk laporan milik user
+      description: |
+        Menampilkan semua match yang berkaitan dengan laporan milik user yang login.
+        Diurutkan berdasarkan skor tertinggi.
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: min_score
+          in: query
+          schema:
+            type: integer
+            minimum: 0
+            maximum: 100
+            default: 60
+          description: Filter match dengan skor minimal
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: List match berhasil diambil
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      matches:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Match'
+                      meta:
+                        $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /matches/{id}:
+    get:
+      tags: [Matches]
+      summary: Detail satu hasil matching
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Detail match
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    $ref: '#/components/schemas/Match'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── NOTIFICATIONS ────────────────────────────────────────────────────────────
+  /notifications:
+    get:
+      tags: [Notifications]
+      summary: List notifikasi milik user yang login
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: is_read
+          in: query
+          schema:
+            type: boolean
+          description: Filter notifikasi sudah/belum dibaca
+        - $ref: '#/components/parameters/PageParam'
+        - $ref: '#/components/parameters/LimitParam'
+      responses:
+        '200':
+          description: List notifikasi
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  data:
+                    type: object
+                    properties:
+                      notifications:
+                        type: array
+                        items:
+                          $ref: '#/components/schemas/Notification'
+                      unread_count:
+                        type: integer
+                        description: Jumlah notifikasi belum dibaca (untuk badge)
+                        example: 3
+                      meta:
+                        $ref: '#/components/schemas/PaginationMeta'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /notifications/read-all:
+    patch:
+      tags: [Notifications]
+      summary: Tandai semua notifikasi sebagai sudah dibaca
+      description: |
+        **Penting**: path `/notifications/read-all` harus didefinisikan **sebelum**
+        `/notifications/{id}/read` agar router tidak salah mengira "read-all" sebagai UUID.
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      responses:
+        '200':
+          description: Semua notifikasi ditandai sudah dibaca
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+              example:
+                success: true
+                message: Semua notifikasi telah ditandai dibaca
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /notifications/{id}/read:
+    patch:
+      tags: [Notifications]
+      summary: Tandai notifikasi sebagai sudah dibaca
+      security:
+        - BearerAuth: []
+        - CookieAuth: []
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Notifikasi ditandai sudah dibaca
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuccessResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  # ── HEALTH CHECK ─────────────────────────────────────────────────────────────
+  /health:
+    get:
+      tags: [Auth]
+      summary: Health check server
+      description: Dipakai Render/Vercel untuk cek apakah server hidup.
+      responses:
+        '200':
+          description: Server berjalan normal
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    type: object
+                    properties:
+                      version:
+                        type: string
+                        example: 1.0.0
+                      env:
+                        type: string
+                        example: production
