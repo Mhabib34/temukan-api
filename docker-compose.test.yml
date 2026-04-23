@@ -1,0 +1,9 @@
+services:
+  db_test:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_DB: temukan_test
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: temukantest123
+    ports:
+      - "5433:5432"
