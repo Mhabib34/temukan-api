@@ -24,14 +24,17 @@ func SetupRouter(handler handler.UserHandler) *gin.Engine {
 		c.Next()
 	})
 
-	api := r.Group("/api/v1")
+	api := r.Group("/api/v1/auth")
 	{
-		api.POST("/users", handler.Create)
+		api.POST("/register", handler.Create)
+		api.POST("/login", handler.Login)
+		api.POST("/refresh", handler.RefreshToken)
 
 		authorized := api.Group("/")
 		authorized.Use(middleware.AuthMiddleware())
 		{
-			//authorized.GET("/users/me", controller.GetProfile)
+			authorized.POST("/me", handler.Me)
+			authorized.GET("/logout", handler.Logout)
 		}
 	}
 
