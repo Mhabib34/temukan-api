@@ -82,7 +82,7 @@ func setupTestDB() (*gorm.DB, error) {
 		}
 	}
 
-	if err := db.AutoMigrate(&model.User{}, &model.Report{}); err != nil {
+	if err := db.AutoMigrate(&model.User{}, &model.Report{}, &model.Match{}, &model.Notification{}); err != nil {
 		return nil, err
 	}
 
