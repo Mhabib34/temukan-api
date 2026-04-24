@@ -59,7 +59,30 @@ func setupTestDB() (*gorm.DB, error) {
 		return nil, err
 	}
 
-	if err := db.AutoMigrate(&model.User{}); err != nil {
+	enums := []string{
+		`DO $$ BEGIN
+            CREATE TYPE report_type AS ENUM ('missing', 'found');
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$;`,
+
+		`DO $$ BEGIN
+            CREATE TYPE report_gender AS ENUM ('male', 'female', 'unknown');
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$;`,
+
+		`DO $$ BEGIN
+            CREATE TYPE report_status AS ENUM ('active', 'resolved');
+        EXCEPTION WHEN duplicate_object THEN NULL;
+        END $$;`,
+	}
+
+	for _, enum := range enums {
+		if err := db.Exec(enum).Error; err != nil {
+			return nil, err
+		}
+	}
+
+	if err := db.AutoMigrate(&model.User{}, &model.Report{}); err != nil {
 		return nil, err
 	}
 

@@ -43,7 +43,43 @@ func ErrorHandler(ctx *gin.Context, err any) {
 		return
 	}
 
+	if forbiddenError(ctx, err) {
+		return
+	}
+
+	if badRequestError(ctx, err) {
+		return
+	}
+
 	internalServerError(ctx, err)
+}
+
+func forbiddenError(ctx *gin.Context, err any) bool {
+	ex, ok := err.(ForbiddenError)
+	if ok {
+		webResponse := dto.WebResponse{
+			Code:   http.StatusForbidden,
+			Status: "FORBIDDEN",
+			Error:  ex.Error(),
+		}
+		helper.WriteToResponseBody(ctx, http.StatusForbidden, webResponse)
+		return true
+	}
+	return false
+}
+
+func badRequestError(ctx *gin.Context, err any) bool {
+	ex, ok := err.(BadRequestError)
+	if ok {
+		webResponse := dto.WebResponse{
+			Code:   http.StatusBadRequest,
+			Status: "BAD REQUEST",
+			Error:  ex.Error(),
+		}
+		helper.WriteToResponseBody(ctx, http.StatusBadRequest, webResponse)
+		return true
+	}
+	return false
 }
 
 func unauthorizedError(ctx *gin.Context, err any) bool {
