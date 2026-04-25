@@ -10,6 +10,8 @@ import (
 func SetupRouter(
 	userHandler handler.UserHandler,
 	reportHandler handler.ReportHandler,
+	matchHandler handler.MatchHandler,
+	notificationHandler handler.NotificationHandler,
 ) *gin.Engine {
 	r := gin.New()
 
@@ -66,7 +68,7 @@ func SetupRouter(
 		reportsPrivate := reports.Group("")
 		reportsPrivate.Use(middleware.AuthMiddleware())
 		{
-			// PENTING: /my harus sebelum /:id agar router tidak salah parse
+			// PENTING: /my harus sebelum /:id
 			reportsPrivate.GET("/my", reportHandler.GetMyReports)
 			reportsPrivate.POST("", reportHandler.Create)
 			reportsPrivate.PUT("/:id", reportHandler.Update)
@@ -79,6 +81,24 @@ func SetupRouter(
 	mapGroup := api.Group("/map")
 	{
 		mapGroup.GET("/pins", reportHandler.GetMapPins)
+	}
+
+	// ── Matches ───────────────────────────────────────────────────────────────
+	matches := api.Group("/matches")
+	matches.Use(middleware.AuthMiddleware())
+	{
+		matches.GET("", matchHandler.GetAll)
+		matches.GET("/:id", matchHandler.GetByID)
+	}
+
+	// ── Notifications ─────────────────────────────────────────────────────────
+	notifications := api.Group("/notifications")
+	notifications.Use(middleware.AuthMiddleware())
+	{
+		notifications.GET("", notificationHandler.GetAll)
+		// PENTING: /read-all harus sebelum /:id/read
+		notifications.PATCH("/read-all", notificationHandler.GetAll)
+		notifications.PATCH("/:id/read", notificationHandler.MarkAsRead)
 	}
 
 	return r

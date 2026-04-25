@@ -43,6 +43,16 @@ func NewReportUsecase(
 	}
 }
 
+// NewReportUsecaseWithWorker — dipakai oleh Wire (non-variadic).
+func NewReportUsecaseWithWorker(
+	repo repository.ReportRepository,
+	validate *validator.Validate,
+	cld *cloudinary.Cloudinary,
+	mw *worker.MatchWorker,
+) ReportUsecase {
+	return NewReportUsecase(repo, validate, cld, mw)
+}
+
 // POST /reports
 func (u *ReportUsecaseImpl) Create(ctx context.Context, reporterID uuid.UUID, request *dto.CreateReportRequest) (*dto.ReportResponse, error) {
 	if err := u.Validate.Struct(request); err != nil {
