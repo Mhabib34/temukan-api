@@ -8,6 +8,7 @@ import (
 	"temukan-api/internal/helper"
 	"temukan-api/internal/model"
 	"temukan-api/internal/repository"
+	"temukan-api/internal/worker"
 
 	"github.com/cloudinary/cloudinary-go/v2"
 	"github.com/go-playground/validator/v10"
@@ -16,19 +17,33 @@ import (
 )
 
 type ReportUsecaseImpl struct {
-	repo     repository.ReportRepository
-	Validate *validator.Validate
-	Cld      *cloudinary.Cloudinary
+	repo        repository.ReportRepository
+	Validate    *validator.Validate
+	Cld         *cloudinary.Cloudinary
+	matchWorker *worker.MatchWorker // nil = matching dinonaktifkan (mode test)
 }
 
-func NewReportUsecase(repo repository.ReportRepository, validate *validator.Validate, cld *cloudinary.Cloudinary) ReportUsecase {
+// NewReportUsecase membuat ReportUsecase.
+// matchWorker boleh nil — dipakai di test tanpa worker.
+func NewReportUsecase(
+	repo repository.ReportRepository,
+	validate *validator.Validate,
+	cld *cloudinary.Cloudinary,
+	matchWorker ...*worker.MatchWorker,
+) ReportUsecase {
+	var mw *worker.MatchWorker
+	if len(matchWorker) > 0 {
+		mw = matchWorker[0]
+	}
 	return &ReportUsecaseImpl{
-		repo:     repo,
-		Validate: validate,
-		Cld:      cld,
+		repo:        repo,
+		Validate:    validate,
+		Cld:         cld,
+		matchWorker: mw,
 	}
 }
 
+// POST /reports
 func (u *ReportUsecaseImpl) Create(ctx context.Context, reporterID uuid.UUID, request *dto.CreateReportRequest) (*dto.ReportResponse, error) {
 	if err := u.Validate.Struct(request); err != nil {
 		return nil, err
@@ -54,10 +69,14 @@ func (u *ReportUsecaseImpl) Create(ctx context.Context, reporterID uuid.UUID, re
 		return nil, err
 	}
 
+	// ← Trigger matching di background (non-blocking, skip jika worker nil)
+	u.enqueue(result.ID)
+
 	response := helper.ToReportResponse(*result)
 	return &response, nil
 }
 
+// GET /reports
 func (u *ReportUsecaseImpl) GetAll(ctx context.Context, query dto.GetReportsQuery) (*dto.ReportListData, error) {
 	reports, total, err := u.repo.FindAll(ctx, query)
 	if err != nil {
@@ -89,19 +108,7 @@ func (u *ReportUsecaseImpl) GetAll(ctx context.Context, query dto.GetReportsQuer
 	}, nil
 }
 
-func (u *ReportUsecaseImpl) GetByID(ctx context.Context, id uuid.UUID) (*dto.ReportResponse, error) {
-	report, err := u.repo.FindByID(ctx, id)
-	if err != nil {
-		if err == gorm.ErrRecordNotFound {
-			return nil, exception.NewNotFoundError("laporan tidak ditemukan")
-		}
-		return nil, err
-	}
-
-	response := helper.ToReportResponse(*report)
-	return &response, nil
-}
-
+// GET /reports/my
 func (u *ReportUsecaseImpl) GetMyReports(ctx context.Context, reporterID uuid.UUID, page, limit int) (*dto.ReportListData, error) {
 	if page < 1 {
 		page = 1
@@ -131,6 +138,21 @@ func (u *ReportUsecaseImpl) GetMyReports(ctx context.Context, reporterID uuid.UU
 	}, nil
 }
 
+// GET /reports/:id
+func (u *ReportUsecaseImpl) GetByID(ctx context.Context, id uuid.UUID) (*dto.ReportResponse, error) {
+	report, err := u.repo.FindByID(ctx, id)
+	if err != nil {
+		if err == gorm.ErrRecordNotFound {
+			return nil, exception.NewNotFoundError("laporan tidak ditemukan")
+		}
+		return nil, err
+	}
+
+	response := helper.ToReportResponse(*report)
+	return &response, nil
+}
+
+// PUT /reports/:id
 func (u *ReportUsecaseImpl) Update(ctx context.Context, id uuid.UUID, reporterID uuid.UUID, request *dto.UpdateReportRequest) (*dto.ReportResponse, error) {
 	report, err := u.repo.FindByID(ctx, id)
 	if err != nil {
@@ -140,12 +162,11 @@ func (u *ReportUsecaseImpl) Update(ctx context.Context, id uuid.UUID, reporterID
 		return nil, err
 	}
 
-	// Hanya pelapor yang boleh update
 	if report.ReporterID != reporterID {
 		return nil, exception.NewForbiddenError("anda tidak memiliki akses ke laporan ini")
 	}
 
-	// Patch fields yang dikirim saja
+	// Patch hanya field yang dikirim
 	if request.Name != nil {
 		report.Name = request.Name
 	}
@@ -182,10 +203,16 @@ func (u *ReportUsecaseImpl) Update(ctx context.Context, id uuid.UUID, reporterID
 		return nil, err
 	}
 
+	// ← Trigger re-matching di background jika report masih aktif
+	if result.Status == model.ReportStatusActive {
+		u.enqueue(result.ID)
+	}
+
 	response := helper.ToReportResponse(*result)
 	return &response, nil
 }
 
+// DELETE /reports/:id
 func (u *ReportUsecaseImpl) Delete(ctx context.Context, id uuid.UUID, reporterID uuid.UUID) error {
 	report, err := u.repo.FindByID(ctx, id)
 	if err != nil {
@@ -202,6 +229,7 @@ func (u *ReportUsecaseImpl) Delete(ctx context.Context, id uuid.UUID, reporterID
 	return u.repo.Delete(ctx, id)
 }
 
+// POST /reports/:id/photo
 func (u *ReportUsecaseImpl) UploadPhoto(ctx context.Context, id uuid.UUID, reporterID uuid.UUID, file *multipart.FileHeader) (*dto.PhotoUploadResponse, error) {
 	report, err := u.repo.FindByID(ctx, id)
 	if err != nil {
@@ -231,6 +259,7 @@ func (u *ReportUsecaseImpl) UploadPhoto(ctx context.Context, id uuid.UUID, repor
 	return &dto.PhotoUploadResponse{PhotoURL: photoURL}, nil
 }
 
+// GET /map/pins
 func (u *ReportUsecaseImpl) GetMapPins(ctx context.Context, query dto.GetMapPinsQuery) (*dto.MapPinsData, error) {
 	reports, err := u.repo.FindMapPins(ctx, query)
 	if err != nil {
@@ -243,4 +272,12 @@ func (u *ReportUsecaseImpl) GetMapPins(ctx context.Context, query dto.GetMapPins
 		Pins:  pins,
 		Total: len(pins),
 	}, nil
+}
+
+// enqueue mengirim job ke worker jika worker tersedia.
+// Nil-safe: tidak panik jika matchWorker belum diinject (misal di test).
+func (u *ReportUsecaseImpl) enqueue(id uuid.UUID) {
+	if u.matchWorker != nil {
+		u.matchWorker.Enqueue(id)
+	}
 }

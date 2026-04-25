@@ -115,3 +115,15 @@ func (r *MatchRepositoryImpl) FindActiveReportsByType(ctx context.Context, repor
 		Find(&reports).Error
 	return reports, err
 }
+
+func (r *MatchRepositoryImpl) ExistsByReportPair(ctx context.Context, foundReportID, missingReportID uuid.UUID) (bool, error) {
+	var count int64
+	err := r.DB.WithContext(ctx).
+		Model(&model.Match{}).
+		Where("found_report_id = ? AND missing_report_id = ?", foundReportID, missingReportID).
+		Count(&count).Error
+	if err != nil {
+		return false, err
+	}
+	return count > 0, nil
+}
