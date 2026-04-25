@@ -1,8 +1,10 @@
 package test
 
 import (
+	"context"
 	"fmt"
 	"net/http"
+	"temukan-api/internal/worker"
 	"testing"
 
 	"temukan-api/internal/handler"
@@ -21,18 +23,29 @@ import (
 func setupMatchRouter(db *gorm.DB) *gin.Engine {
 	validate := validator.New()
 
-	// User layer
 	userRepo := repository.NewUserRepository(db)
 	userUsecase := usecase.NewUserUsecase(userRepo, validate)
 	userHandler := handler.NewUserHandlerImpl(userUsecase)
 
-	// Report layer
 	reportRepo := repository.NewReportRepository(db)
-	reportUsecase := usecase.NewReportUsecase(reportRepo, validate, nil)
+	matchRepo := repository.NewMatchRepository(db)
+	notifRepo := repository.NewNotificationRepository(db)
+
+	// Buat worker
+	matchWorker := worker.NewMatchWorker(
+		reportRepo, matchRepo, notifRepo, userRepo,
+		nil, // emailService boleh nil di test
+		2,
+	)
+
+	// Start worker di background
+	ctx := context.Background()
+	go matchWorker.Start(ctx)
+
+	// Inject worker ke usecase
+	reportUsecase := usecase.NewReportUsecase(reportRepo, validate, nil, matchWorker)
 	reportHandler := handler.NewReportHandlerImpl(reportUsecase)
 
-	// Match layer
-	matchRepo := repository.NewMatchRepository(db)
 	matchUsecase := usecase.NewMatchUsecase(matchRepo)
 	matchHandler := handler.NewMatchHandlerImpl(matchUsecase)
 
@@ -52,6 +65,7 @@ func setupMatchRouter(db *gorm.DB) *gin.Engine {
 	reportsPrivate := reports.Group("")
 	reportsPrivate.Use(middleware.AuthMiddleware())
 	reportsPrivate.POST("", reportHandler.Create)
+	reportsPrivate.PUT("/:id", reportHandler.Update)
 
 	// Matches
 	matches := api.Group("/matches")

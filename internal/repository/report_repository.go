@@ -17,4 +17,6 @@ type ReportRepository interface {
 	Update(ctx context.Context, report *model.Report) (*model.Report, error)
 	UpdatePhotoURL(ctx context.Context, id uuid.UUID, photoURL string) error
 	Delete(ctx context.Context, id uuid.UUID) error
+
+	FindActiveByType(ctx context.Context, reportType model.ReportType) ([]model.Report, error)
 }

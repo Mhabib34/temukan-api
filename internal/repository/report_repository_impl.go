@@ -160,3 +160,11 @@ func (r *ReportRepositoryImpl) UpdatePhotoURL(ctx context.Context, id uuid.UUID,
 func (r *ReportRepositoryImpl) Delete(ctx context.Context, id uuid.UUID) error {
 	return r.DB.WithContext(ctx).Where("id = ?", id).Delete(&model.Report{}).Error
 }
+
+func (r *ReportRepositoryImpl) FindActiveByType(ctx context.Context, reportType model.ReportType) ([]model.Report, error) {
+	var reports []model.Report
+	err := r.DB.WithContext(ctx).
+		Where("type = ? AND status = ?", reportType, model.ReportStatusActive).
+		Find(&reports).Error
+	return reports, err
+}

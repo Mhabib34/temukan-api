@@ -30,4 +30,6 @@ type MatchRepository interface {
 
 	// FindActiveReportsByType mengambil laporan aktif berdasarkan tipe (untuk matching).
 	FindActiveReportsByType(ctx context.Context, reportType model.ReportType) ([]model.Report, error)
+
+	ExistsByReportPair(ctx context.Context, foundReportID, missingReportID uuid.UUID) (bool, error)
 }
