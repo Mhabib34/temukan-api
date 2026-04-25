@@ -18,7 +18,8 @@ type Config struct {
 	DatabaseURL string
 
 	// JWT
-	JWTSecret            string
+	JWTAccessSecret      string
+	JWTRefreshSecret     string
 	AccessTokenDuration  time.Duration
 	RefreshTokenDuration time.Duration
 }
@@ -43,7 +44,8 @@ func Load() *Config {
 		Port:                 getEnv("PORT", "8080"),
 		Env:                  getEnv("APP_ENV", "development"),
 		DatabaseURL:          mustEnv("DATABASE_URL"),
-		JWTSecret:            mustEnv("JWT_SECRET"),
+		JWTAccessSecret:      mustEnv("JWT_ACCESS_SECRET"),
+		JWTRefreshSecret:     mustEnv("JWT_REFRESH_SECRET"),
 		AccessTokenDuration:  time.Duration(accessMinutes) * time.Minute,
 		RefreshTokenDuration: time.Duration(refreshDays) * 24 * time.Hour,
 	}

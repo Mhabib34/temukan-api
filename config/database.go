@@ -2,7 +2,6 @@ package config
 
 import (
 	"log"
-	"temukan-api/internal/model"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"
@@ -20,11 +19,6 @@ func NewDB(cfg *Config) *gorm.DB {
 	})
 	if err != nil {
 		log.Fatalf("Failed to connect to database: %v", err)
-	}
-
-	// Auto migrate tabel yang dibutuhkan auth
-	if err := db.AutoMigrate(&model.User{}, &model.RefreshToken{}); err != nil {
-		log.Fatalf("Failed to migrate database: %v", err)
 	}
 
 	log.Println("Database connected and migrated")
