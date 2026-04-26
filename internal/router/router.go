@@ -1,6 +1,8 @@
 package router
 
 import (
+	"os"
+	"strings"
 	"temukan-api/internal/handler"
 	"temukan-api/internal/middleware"
 
@@ -17,16 +19,7 @@ func SetupRouter(
 
 	r.Use(gin.Logger())
 	r.Use(middleware.ErrorRecovery())
-	r.Use(func(c *gin.Context) {
-		c.Writer.Header().Set("Access-Control-Allow-Origin", "*")
-		c.Writer.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
-		c.Writer.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Client-Type")
-		if c.Request.Method == "OPTIONS" {
-			c.AbortWithStatus(204)
-			return
-		}
-		c.Next()
-	})
+	r.Use(corsMiddleware())
 
 	api := r.Group("/api/v1")
 
@@ -68,7 +61,6 @@ func SetupRouter(
 		reportsPrivate := reports.Group("")
 		reportsPrivate.Use(middleware.AuthMiddleware())
 		{
-			// PENTING: /my harus sebelum /:id
 			reportsPrivate.GET("/my", reportHandler.GetMyReports)
 			reportsPrivate.POST("", reportHandler.Create)
 			reportsPrivate.PUT("/:id", reportHandler.Update)
@@ -96,10 +88,45 @@ func SetupRouter(
 	notifications.Use(middleware.AuthMiddleware())
 	{
 		notifications.GET("", notificationHandler.GetAll)
-		// PENTING: /read-all harus sebelum /:id/read
 		notifications.PATCH("/read-all", notificationHandler.GetAll)
 		notifications.PATCH("/:id/read", notificationHandler.MarkAsRead)
 	}
 
 	return r
+}
+
+// corsMiddleware mengganti wildcard "*" dengan origin spesifik agar
+// kompatibel dengan withCredentials: true (httpOnly cookie).
+func corsMiddleware() gin.HandlerFunc {
+	// Baca dari env: ALLOWED_ORIGINS=http://localhost:4000,https://temukan.id
+	raw := os.Getenv("ALLOWED_ORIGINS")
+	allowed := map[string]struct{}{}
+	if raw != "" {
+		for _, o := range strings.Split(raw, ",") {
+			allowed[strings.TrimSpace(o)] = struct{}{}
+		}
+	} else {
+		// Default development
+		allowed["http://localhost:3000"] = struct{}{}
+		allowed["http://localhost:4000"] = struct{}{}
+	}
+
+	return func(c *gin.Context) {
+		origin := c.Request.Header.Get("Origin")
+
+		if _, ok := allowed[origin]; ok {
+			c.Header("Access-Control-Allow-Origin", origin)      // ← spesifik, bukan *
+			c.Header("Access-Control-Allow-Credentials", "true") // ← wajib untuk cookie
+			c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
+			c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Client-Type")
+			c.Header("Access-Control-Max-Age", "86400")
+		}
+
+		if c.Request.Method == "OPTIONS" {
+			c.AbortWithStatus(204)
+			return
+		}
+
+		c.Next()
+	}
 }
