@@ -56,10 +56,10 @@ func (r *ReportRepositoryImpl) FindAll(ctx context.Context, query dto.GetReports
 		db = db.Where("type = ?", *query.Type)
 	}
 	if query.City != nil && *query.City != "" {
-		db = db.Where("LOWER(city) = LOWER(?)", *query.City)
+        db = db.Where("LOWER(city) LIKE ?", "%"+strings.ToLower(*query.City)+"%")
 	}
 	if query.Province != nil && *query.Province != "" {
-		db = db.Where("LOWER(province) = LOWER(?)", *query.Province)
+		db = db.Where("LOWER(province) LIKE ?", "%"+strings.ToLower(*query.Province)+"%")
 	}
 	if query.Gender != nil {
 		db = db.Where("gender = ?", *query.Gender)
