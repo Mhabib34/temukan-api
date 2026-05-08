@@ -2,7 +2,7 @@ package worker
 
 import (
 	"context"
-	"log"
+	"temukan-api/internal/logger"
 	"temukan-api/internal/model"
 	"temukan-api/internal/repository"
 	"temukan-api/internal/service"
@@ -11,23 +11,20 @@ import (
 	"golang.org/x/sync/errgroup"
 )
 
-// MatchJob adalah payload yang dikirim ke worker ketika ada report baru/update.
 type MatchJob struct {
 	ReportID uuid.UUID
 }
 
-// MatchWorker mendengarkan channel jobs dan menjalankan proses matching di background.
 type MatchWorker struct {
 	jobs         chan MatchJob
 	reportRepo   repository.ReportRepository
 	matchRepo    repository.MatchRepository
 	notifRepo    repository.NotificationRepository
 	userRepo     repository.UserRepository
-	emailService *service.EmailService // ← Resend
+	emailService *service.EmailService
 	workerCount  int
 }
 
-// NewMatchWorker membuat instance MatchWorker baru.
 func NewMatchWorker(
 	reportRepo repository.ReportRepository,
 	matchRepo repository.MatchRepository,
@@ -50,30 +47,28 @@ func NewMatchWorker(
 	}
 }
 
-// Enqueue mengirim job ke channel (non-blocking).
-// Dipanggil dari usecase setelah Create/Update report.
 func (w *MatchWorker) Enqueue(reportID uuid.UUID) {
+	log := logger.Get()
 	select {
 	case w.jobs <- MatchJob{ReportID: reportID}:
-		log.Printf("[MatchWorker] job enqueued for report %s", reportID)
+		log.Info("job enqueued", "worker", "MatchWorker", "report_id", reportID)
 	default:
-		log.Printf("[MatchWorker] WARNING: job queue full, dropping job for report %s", reportID)
+		log.Warn("job queue full, dropping job", "worker", "MatchWorker", "report_id", reportID)
 	}
 }
 
-// Start menjalankan worker pool. Blok sampai ctx dibatalkan.
-// Panggil dengan `go worker.Start(ctx)` di main.go.
 func (w *MatchWorker) Start(ctx context.Context) {
+	log := logger.Get()
 	eg, ctx := errgroup.WithContext(ctx)
 
 	for i := 0; i < w.workerCount; i++ {
 		workerID := i
 		eg.Go(func() error {
-			log.Printf("[MatchWorker] worker #%d started", workerID)
+			log.Info("worker started", "worker", "MatchWorker", "worker_id", workerID)
 			for {
 				select {
 				case <-ctx.Done():
-					log.Printf("[MatchWorker] worker #%d stopped", workerID)
+					log.Info("worker stopped", "worker", "MatchWorker", "worker_id", workerID)
 					return nil
 				case job, ok := <-w.jobs:
 					if !ok {
@@ -86,22 +81,22 @@ func (w *MatchWorker) Start(ctx context.Context) {
 	}
 
 	if err := eg.Wait(); err != nil {
-		log.Printf("[MatchWorker] worker error: %v", err)
+		log.Error("worker error", "worker", "MatchWorker", "error", err)
 	}
 }
 
-// processJob adalah inti logika matching untuk satu report.
 func (w *MatchWorker) processJob(ctx context.Context, job MatchJob) {
-	log.Printf("[MatchWorker] processing report %s", job.ReportID)
+	log := logger.Get()
+	log.Info("processing job", "worker", "MatchWorker", "report_id", job.ReportID)
 
 	report, err := w.reportRepo.FindByID(ctx, job.ReportID)
 	if err != nil {
-		log.Printf("[MatchWorker] report %s not found: %v", job.ReportID, err)
+		log.Error("report not found", "worker", "MatchWorker", "report_id", job.ReportID, "error", err)
 		return
 	}
 
 	if report.Status != model.ReportStatusActive {
-		log.Printf("[MatchWorker] report %s is not active, skipping", job.ReportID)
+		log.Info("report not active, skipping", "worker", "MatchWorker", "report_id", job.ReportID, "status", report.Status)
 		return
 	}
 
@@ -112,19 +107,20 @@ func (w *MatchWorker) processJob(ctx context.Context, job MatchJob) {
 
 	candidates, err := w.reportRepo.FindActiveByType(ctx, oppositeType)
 	if err != nil {
-		log.Printf("[MatchWorker] failed to fetch candidates: %v", err)
+		log.Error("failed to fetch candidates", "worker", "MatchWorker", "error", err)
 		return
 	}
 
-	log.Printf("[MatchWorker] comparing report %s against %d candidates", job.ReportID, len(candidates))
+	log.Info("comparing report against candidates", "worker", "MatchWorker", "report_id", job.ReportID, "candidate_count", len(candidates))
 
 	for _, candidate := range candidates {
 		w.tryMatch(ctx, *report, candidate)
 	}
 }
 
-// tryMatch menghitung skor dan, jika lolos threshold, simpan match + kirim notifikasi.
 func (w *MatchWorker) tryMatch(ctx context.Context, report, candidate model.Report) {
+	log := logger.Get()
+
 	var foundReport, missingReport model.Report
 	if report.Type == model.ReportTypeFound {
 		foundReport = report
@@ -134,10 +130,9 @@ func (w *MatchWorker) tryMatch(ctx context.Context, report, candidate model.Repo
 		missingReport = report
 	}
 
-	// Skip duplikat
 	exists, err := w.matchRepo.ExistsByReportPair(ctx, foundReport.ID, missingReport.ID)
 	if err != nil {
-		log.Printf("[MatchWorker] ExistsByReportPair error: %v", err)
+		log.Error("ExistsByReportPair error", "worker", "MatchWorker", "error", err)
 		return
 	}
 	if exists {
@@ -145,13 +140,12 @@ func (w *MatchWorker) tryMatch(ctx context.Context, report, candidate model.Repo
 	}
 
 	score := service.ScoreReports(foundReport, missingReport)
-	log.Printf("[MatchWorker] score found=%s missing=%s => %d", foundReport.ID, missingReport.ID, score)
+	log.Debug("score calculated", "worker", "MatchWorker", "found_id", foundReport.ID, "missing_id", missingReport.ID, "score", score)
 
 	if score < service.MinMatchScore {
 		return
 	}
 
-	// Simpan match ke DB
 	savedMatch, err := w.matchRepo.Create(ctx, &model.Match{
 		FoundReportID:   foundReport.ID,
 		MissingReportID: missingReport.ID,
@@ -159,23 +153,21 @@ func (w *MatchWorker) tryMatch(ctx context.Context, report, candidate model.Repo
 		Notified:        false,
 	})
 	if err != nil {
-		log.Printf("[MatchWorker] failed to save match: %v", err)
+		log.Error("failed to save match", "worker", "MatchWorker", "error", err)
 		return
 	}
 
-	log.Printf("[MatchWorker] match saved: %s (score=%d)", savedMatch.ID, score)
+	log.Info("match saved", "worker", "MatchWorker", "match_id", savedMatch.ID, "score", score)
 
-	// Kirim notifikasi DB + email ke kedua pihak
 	w.sendNotifications(ctx, savedMatch, foundReport, missingReport)
 }
 
-// sendNotifications menyimpan notifikasi ke DB dan mengirim email via Resend.
-// Email dikirim sebagai goroutine terpisah (best-effort, tidak block worker).
 func (w *MatchWorker) sendNotifications(
 	ctx context.Context,
 	match *model.Match,
 	foundReport, missingReport model.Report,
 ) {
+	log := logger.Get()
 	matchID := match.ID
 
 	type recipient struct {
@@ -200,7 +192,6 @@ func (w *MatchWorker) sendNotifications(
 	for _, r := range recipients {
 		reportID := r.report.ID
 
-		// 1. Simpan ke DB — selalu dilakukan, tidak bergantung email
 		notif := &model.Notification{
 			UserID:   r.report.ReporterID,
 			Message:  r.message,
@@ -209,23 +200,19 @@ func (w *MatchWorker) sendNotifications(
 			MatchID:  &matchID,
 		}
 		if err := w.notifRepo.Create(ctx, notif); err != nil {
-			log.Printf("[MatchWorker] failed to create DB notification for user %s: %v",
-				r.report.ReporterID, err)
+			log.Error("failed to create DB notification", "worker", "MatchWorker", "user_id", r.report.ReporterID, "error", err)
 		}
 
-		// 2. Kirim email via Resend — best-effort di goroutine terpisah
 		userID := r.report.ReporterID
 		role := r.role
 		go w.sendEmail(ctx, match, foundReport, missingReport, userID, role)
 	}
 
-	// Tandai match sudah dinotifikasi
 	if err := w.matchRepo.MarkNotified(ctx, matchID); err != nil {
-		log.Printf("[MatchWorker] failed to mark match as notified: %v", err)
+		log.Error("failed to mark match as notified", "worker", "MatchWorker", "match_id", matchID, "error", err)
 	}
 }
 
-// sendEmail fetch user lalu kirim email. Dijalankan sebagai goroutine terpisah.
 func (w *MatchWorker) sendEmail(
 	ctx context.Context,
 	match *model.Match,
@@ -233,14 +220,16 @@ func (w *MatchWorker) sendEmail(
 	userID uuid.UUID,
 	role string,
 ) {
+	log := logger.Get()
+
 	if w.emailService == nil {
-		log.Printf("[MatchWorker] sendEmail: emailService is nil, skipping for user %s", userID)
+		log.Warn("emailService is nil, skipping email", "worker", "MatchWorker", "user_id", userID)
 		return
 	}
 
 	user, err := w.userRepo.FindByID(ctx, userID)
 	if err != nil {
-		log.Printf("[MatchWorker] sendEmail: user %s not found: %v", userID, err)
+		log.Error("user not found for email", "worker", "MatchWorker", "user_id", userID, "error", err)
 		return
 	}
 
@@ -253,12 +242,11 @@ func (w *MatchWorker) sendEmail(
 	}
 
 	if err := w.emailService.SendMatchNotification(ctx, payload); err != nil {
-		// Gagal kirim email tidak fatal — notifikasi sudah tersimpan di DB
-		log.Printf("[MatchWorker] sendEmail: failed for user %s (%s): %v", userID, role, err)
+		log.Error("failed to send email", "worker", "MatchWorker", "user_id", userID, "role", role, "match_id", match.ID, "error", err)
 		return
 	}
 
-	log.Printf("[MatchWorker] email sent to %s (%s) for match %s", user.Email, role, match.ID)
+	log.Info("email sent", "worker", "MatchWorker", "email", user.Email, "role", role, "match_id", match.ID)
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────

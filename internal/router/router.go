@@ -4,6 +4,7 @@ import (
 	"os"
 	"strings"
 	"temukan-api/internal/handler"
+	"temukan-api/internal/logger"
 	"temukan-api/internal/middleware"
 
 	"github.com/gin-gonic/gin"
@@ -17,7 +18,7 @@ func SetupRouter(
 ) *gin.Engine {
 	r := gin.New()
 
-	r.Use(gin.Logger())
+	r.Use(logger.GinMiddleware()) // ← ganti gin.Logger()
 	r.Use(middleware.ErrorRecovery())
 	r.Use(corsMiddleware())
 
@@ -98,7 +99,6 @@ func SetupRouter(
 // corsMiddleware mengganti wildcard "*" dengan origin spesifik agar
 // kompatibel dengan withCredentials: true (httpOnly cookie).
 func corsMiddleware() gin.HandlerFunc {
-	// Baca dari env: ALLOWED_ORIGINS=http://localhost:4000,https://temukan.id
 	raw := os.Getenv("ALLOWED_ORIGINS")
 	allowed := map[string]struct{}{}
 	if raw != "" {
@@ -106,7 +106,6 @@ func corsMiddleware() gin.HandlerFunc {
 			allowed[strings.TrimSpace(o)] = struct{}{}
 		}
 	} else {
-		// Default development
 		allowed["http://localhost:3000"] = struct{}{}
 		allowed["http://localhost:4000"] = struct{}{}
 	}
@@ -115,8 +114,8 @@ func corsMiddleware() gin.HandlerFunc {
 		origin := c.Request.Header.Get("Origin")
 
 		if _, ok := allowed[origin]; ok {
-			c.Header("Access-Control-Allow-Origin", origin)      // ← spesifik, bukan *
-			c.Header("Access-Control-Allow-Credentials", "true") // ← wajib untuk cookie
+			c.Header("Access-Control-Allow-Origin", origin)
+			c.Header("Access-Control-Allow-Credentials", "true")
 			c.Header("Access-Control-Allow-Methods", "GET, POST, PUT, PATCH, DELETE, OPTIONS")
 			c.Header("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Client-Type")
 			c.Header("Access-Control-Max-Age", "86400")
