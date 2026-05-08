@@ -2,20 +2,25 @@ package main
 
 import (
 	"context"
-	"log"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"temukan-api/cmd/wire"
+	"temukan-api/internal/logger"
+
 	"time"
 )
 
 func main() {
+	// ── 0. Init logger ────────────────────────────────────────────────────────
+	logger.Init()
+	log := logger.Get()
+
 	// ── 1. Wire — inisialisasi semua dependency ───────────────────────────────
 	engine, cleanup, err := wire.InitializeApp()
 	if err != nil {
-		log.Fatalf("failed to initialize app: %v", err)
+		logger.Fatal("failed to initialize app", "error", err)
 	}
 
 	// ── 2. Port dari env, default 8080 ────────────────────────────────────────
@@ -34,9 +39,9 @@ func main() {
 	}
 
 	go func() {
-		log.Printf("[Server] listening on :%s", port)
+		log.Info("server starting", "port", port)
 		if err := srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			log.Fatalf("[Server] listen error: %v", err)
+			logger.Fatal("server listen error", "error", err)
 		}
 	}()
 
@@ -45,18 +50,16 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	log.Println("[Server] shutting down...")
+	log.Info("server shutting down...")
 
-	// Stop worker (cancel context worker di dalam cleanup)
 	cleanup()
 
-	// Beri waktu 10 detik untuk request yang sedang berjalan selesai
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
 	if err := srv.Shutdown(shutdownCtx); err != nil {
-		log.Fatalf("[Server] forced shutdown: %v", err)
+		logger.Fatal("server forced shutdown", "error", err)
 	}
 
-	log.Println("[Server] exited cleanly")
+	log.Info("server exited cleanly")
 }

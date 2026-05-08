@@ -12,10 +12,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"
 	"github.com/google/wire"
-	"log"
 	"os"
+	"strconv"
 	"temukan-api/config"
 	"temukan-api/internal/handler"
+	"temukan-api/internal/logger"
 	"temukan-api/internal/repository"
 	"temukan-api/internal/router"
 	"temukan-api/internal/service"
@@ -25,8 +26,6 @@ import (
 
 // Injectors from wire.go:
 
-// InitializeApp adalah entry-point Wire.
-// Jalankan: go run github.com/google/wire/cmd/wire@latest gen ./cmd/wire/...
 func InitializeApp() (*gin.Engine, func(), error) {
 	configConfig := config.Load()
 	db := config.NewDB(configConfig)
@@ -64,17 +63,14 @@ var infraSet = wire.NewSet(config.Load, config.NewDB, config.NewCloudinary, prov
 	provideEmailService,
 )
 
-// Constructor sudah return interface — tidak perlu wire.Bind
 var repositorySet = wire.NewSet(repository.NewUserRepository, repository.NewReportRepository, repository.NewMatchRepository, repository.NewNotificationRepository)
 
 var workerSet = wire.NewSet(
 	provideMatchWorker,
 )
 
-// Constructor sudah return interface — tidak perlu wire.Bind
 var usecaseSet = wire.NewSet(usecase.NewUserUsecase, provideReportUsecase, usecase.NewMatchUsecase, usecase.NewNotificationUsecase)
 
-// Constructor return *Impl — perlu wire.Bind ke interface
 var handlerSet = wire.NewSet(handler.NewUserHandlerImpl, wire.Bind(new(handler.UserHandler), new(*handler.UserHandlerImpl)), handler.NewReportHandlerImpl, wire.Bind(new(handler.ReportHandler), new(*handler.ReportHandlerImpl)), handler.NewMatchHandlerImpl, wire.Bind(new(handler.MatchHandler), new(*handler.MatchHandlerImpl)), handler.NewNotificationHandlerImpl, wire.Bind(new(handler.NotificationHandler), new(*handler.NotificationHandlerImpl)))
 
 func provideValidator() *validator.Validate {
@@ -85,8 +81,6 @@ func provideEmailService() *service.EmailService {
 	return service.NewEmailService(os.Getenv("RESEND_API_KEY"), os.Getenv("RESEND_FROM_EMAIL"), os.Getenv("APP_URL"))
 }
 
-// provideMatchWorker membuat MatchWorker, langsung start di goroutine,
-// dan return cleanup func untuk graceful shutdown.
 func provideMatchWorker(
 	reportRepo repository.ReportRepository,
 	matchRepo repository.MatchRepository,
@@ -94,22 +88,29 @@ func provideMatchWorker(
 	userRepo repository.UserRepository,
 	emailSvc *service.EmailService,
 ) (*worker.MatchWorker, func(), error) {
-	mw := worker.NewMatchWorker(reportRepo, matchRepo, notifRepo, userRepo, emailSvc, 3)
+	log := logger.Get()
+
+	count := 3
+	if v := os.Getenv("WORKER_COUNT"); v != "" {
+		if n, err := strconv.Atoi(v); err == nil && n > 0 {
+			count = n
+		}
+	}
+
+	mw := worker.NewMatchWorker(reportRepo, matchRepo, notifRepo, userRepo, emailSvc, count)
 
 	ctx, cancel := context.WithCancel(context.Background())
 	go mw.Start(ctx)
-	log.Println("[MatchWorker] started")
+	log.Info("match worker started")
 
 	cleanup := func() {
 		cancel()
-		log.Println("[MatchWorker] stopped")
+		log.Info("match worker stopped")
 	}
 
 	return mw, cleanup, nil
 }
 
-// provideReportUsecase adalah wrapper karena NewReportUsecase memakai variadic
-// parameter untuk matchWorker — Wire tidak bisa inject variadic secara langsung.
 func provideReportUsecase(
 	repo repository.ReportRepository,
 	validate *validator.Validate,
