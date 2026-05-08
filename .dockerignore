@@ -1,0 +1,21 @@
+# Git
+.git
+.gitignore
+
+# Docker
+Dockerfile
+.dockerignore
+docker-compose*.yml
+
+# Development & test
+*_test.go
+.env
+.env.*
+
+# Build artifacts
+server
+bin/
+
+# Docs
+*.md
+README*
