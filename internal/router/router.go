@@ -15,10 +15,11 @@ func SetupRouter(
 	reportHandler handler.ReportHandler,
 	matchHandler handler.MatchHandler,
 	notificationHandler handler.NotificationHandler,
+	statsHandler handler.StatsHandler, // ← tambah ini
 ) *gin.Engine {
 	r := gin.New()
 
-	r.Use(logger.GinMiddleware()) // ← ganti gin.Logger()
+	r.Use(logger.GinMiddleware())
 	r.Use(middleware.ErrorRecovery())
 	r.Use(corsMiddleware())
 
@@ -35,6 +36,9 @@ func SetupRouter(
 			},
 		})
 	})
+
+	// ── Stats (public) ───────────────────────────────────────────────────────
+	api.GET("/stats", statsHandler.GetStats)
 
 	// ── Auth ─────────────────────────────────────────────────────────────────
 	auth := api.Group("/auth")
