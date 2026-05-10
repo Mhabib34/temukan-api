@@ -38,6 +38,7 @@ var repositorySet = wire.NewSet(
 	repository.NewReportRepository,
 	repository.NewMatchRepository,
 	repository.NewNotificationRepository,
+	repository.NewStatsRepository,
 )
 
 var workerSet = wire.NewSet(
@@ -49,6 +50,7 @@ var usecaseSet = wire.NewSet(
 	provideReportUsecase,
 	usecase.NewMatchUsecase,
 	usecase.NewNotificationUsecase,
+	usecase.NewStatsUsecase,
 )
 
 var handlerSet = wire.NewSet(
@@ -63,6 +65,9 @@ var handlerSet = wire.NewSet(
 
 	handler.NewNotificationHandlerImpl,
 	wire.Bind(new(handler.NotificationHandler), new(*handler.NotificationHandlerImpl)),
+
+	handler.NewStatsHandlerImpl,
+	wire.Bind(new(handler.StatsHandler), new(*handler.StatsHandlerImpl)),
 )
 
 // ── Individual Providers ──────────────────────────────────────────────────────
