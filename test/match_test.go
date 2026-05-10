@@ -139,6 +139,23 @@ func createReportForMatch(token, reportType, gender string) string {
 	return id
 }
 
+func createReportForMatchCity(token, reportType, gender, city string) string {
+	router := getMatchRouter()
+	resp := doPostAuth(router, "/api/v1/reports", fmt.Sprintf(`{
+		"type":               "%s",
+		"gender":             "%s",
+		"estimated_age":      50,
+		"description":        "Laporan untuk keperluan test match sistem",
+		"last_seen_location": "Jalan Utama No. 1",
+		"city":               "%s",
+		"province":           "Jawa Timur"
+	}`, reportType, gender, city), token)
+	body := parseBodyReport(resp)
+	data, _ := body["data"].(map[string]any)
+	id, _ := data["id"].(string)
+	return id
+}
+
 // ═══════════════════════════════════════════════════════════════════════════════
 // GET /matches — GET ALL MATCHES
 // ═══════════════════════════════════════════════════════════════════════════════
@@ -203,6 +220,7 @@ func TestGetMatchesResponseStructure(t *testing.T) {
 }
 
 // 3. User hanya melihat match yang berkaitan dengan laporannya sendiri
+// 3. User hanya melihat match yang berkaitan dengan laporannya sendiri
 func TestGetMatchesOnlyOwnMatches(t *testing.T) {
 	truncateMatches(testDB)
 	truncateReports(testDB)
@@ -212,28 +230,33 @@ func TestGetMatchesOnlyOwnMatches(t *testing.T) {
 	tokenB := registerAndLoginMatch("ownmatch2@mail.com", "Own Match Dua", "seeker")
 	tokenC := registerAndLoginMatch("ownmatch3@mail.com", "Own Match Tiga", "finder")
 
-	// Match antara A dan B
+	// Match antara A (found) dan B (missing) — kota Medan, gender male
 	foundIDA := createReportForMatch(tokenA, "found", "male")
 	missingIDB := createReportForMatch(tokenB, "missing", "male")
-	seedMatchDirect(foundIDA, missingIDB, 80)
+	matchAB := seedMatchDirect(foundIDA, missingIDB, 80)
+	_ = matchAB
 
-	// Match antara B dan C (tidak melibatkan A sebagai found reporter)
-	foundIDC := createReportForMatch(tokenC, "found", "female")
-	missingIDC := createReportForMatch(tokenC, "missing", "female")
+	// Laporan C — kota BERBEDA (Surabaya) supaya worker tidak bisa
+	// membuat match silang dengan laporan A atau B di Medan
+	foundIDC := createReportForMatchCity(tokenC, "found", "female", "Surabaya")
+	missingIDC := createReportForMatchCity(tokenC, "missing", "female", "Surabaya")
 	seedMatchDirect(foundIDC, missingIDC, 75)
 
-	// User C tidak boleh lihat match A-B
+	// User C hanya boleh lihat match yang melibatkan laporannya sendiri
 	resp := doGet(getMatchRouter(), "/api/v1/matches", tokenC)
 	body := parseBodyReport(resp)
 
+	assert.Equal(t, 200, resp.StatusCode)
 	data := body["data"].(map[string]any)
 	matches := data["matches"].([]any)
 
 	for _, m := range matches {
 		match := m.(map[string]any)
 		matchID := match["id"].(string)
-		// Pastikan tidak ada match antara A dan B di hasil C
-		assert.NotEqual(t, foundIDA, getFoundReportID(match), "user C tidak boleh lihat match user A: %s", matchID)
+		frID := getFoundReportID(match)
+		// Tidak boleh ada match yang found_report-nya milik user A
+		assert.NotEqual(t, foundIDA, frID,
+			"user C tidak boleh lihat match user A: matchID=%s", matchID)
 	}
 }
 
