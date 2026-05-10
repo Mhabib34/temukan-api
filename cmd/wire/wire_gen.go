@@ -51,7 +51,10 @@ func InitializeApp() (*gin.Engine, func(), error) {
 	matchHandlerImpl := handler.NewMatchHandlerImpl(matchUsecase)
 	notificationUsecase := usecase.NewNotificationUsecase(notificationRepository)
 	notificationHandlerImpl := handler.NewNotificationHandlerImpl(notificationUsecase)
-	engine := router.SetupRouter(userHandlerImpl, reportHandlerImpl, matchHandlerImpl, notificationHandlerImpl)
+	statsRepository := repository.NewStatsRepository(db)
+	statsUsecase := usecase.NewStatsUsecase(statsRepository)
+	statsHandlerImpl := handler.NewStatsHandlerImpl(statsUsecase)
+	engine := router.SetupRouter(userHandlerImpl, reportHandlerImpl, matchHandlerImpl, notificationHandlerImpl, statsHandlerImpl)
 	return engine, func() {
 		cleanup()
 	}, nil
@@ -63,15 +66,15 @@ var infraSet = wire.NewSet(config.Load, config.NewDB, config.NewCloudinary, prov
 	provideEmailService,
 )
 
-var repositorySet = wire.NewSet(repository.NewUserRepository, repository.NewReportRepository, repository.NewMatchRepository, repository.NewNotificationRepository)
+var repositorySet = wire.NewSet(repository.NewUserRepository, repository.NewReportRepository, repository.NewMatchRepository, repository.NewNotificationRepository, repository.NewStatsRepository)
 
 var workerSet = wire.NewSet(
 	provideMatchWorker,
 )
 
-var usecaseSet = wire.NewSet(usecase.NewUserUsecase, provideReportUsecase, usecase.NewMatchUsecase, usecase.NewNotificationUsecase)
+var usecaseSet = wire.NewSet(usecase.NewUserUsecase, provideReportUsecase, usecase.NewMatchUsecase, usecase.NewNotificationUsecase, usecase.NewStatsUsecase)
 
-var handlerSet = wire.NewSet(handler.NewUserHandlerImpl, wire.Bind(new(handler.UserHandler), new(*handler.UserHandlerImpl)), handler.NewReportHandlerImpl, wire.Bind(new(handler.ReportHandler), new(*handler.ReportHandlerImpl)), handler.NewMatchHandlerImpl, wire.Bind(new(handler.MatchHandler), new(*handler.MatchHandlerImpl)), handler.NewNotificationHandlerImpl, wire.Bind(new(handler.NotificationHandler), new(*handler.NotificationHandlerImpl)))
+var handlerSet = wire.NewSet(handler.NewUserHandlerImpl, wire.Bind(new(handler.UserHandler), new(*handler.UserHandlerImpl)), handler.NewReportHandlerImpl, wire.Bind(new(handler.ReportHandler), new(*handler.ReportHandlerImpl)), handler.NewMatchHandlerImpl, wire.Bind(new(handler.MatchHandler), new(*handler.MatchHandlerImpl)), handler.NewNotificationHandlerImpl, wire.Bind(new(handler.NotificationHandler), new(*handler.NotificationHandlerImpl)), handler.NewStatsHandlerImpl, wire.Bind(new(handler.StatsHandler), new(*handler.StatsHandlerImpl)))
 
 func provideValidator() *validator.Validate {
 	return validator.New()

@@ -58,7 +58,6 @@ tags:
 # COMPONENTS (single, merged)
 # ═══════════════════════════════════════════════════════════════════════════════
 components:
-
   # ── Security Schemes ────────────────────────────────────────────────────────
   securitySchemes:
     BearerAuth:
@@ -117,7 +116,7 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: "#/components/schemas/ErrorResponse"
           example:
             success: false
             message: Silakan login terlebih dahulu
@@ -128,7 +127,7 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: "#/components/schemas/ErrorResponse"
           example:
             success: false
             message: Anda tidak memiliki akses ke laporan ini
@@ -139,7 +138,7 @@ components:
       content:
         application/json:
           schema:
-            $ref: '#/components/schemas/ErrorResponse'
+            $ref: "#/components/schemas/ErrorResponse"
           example:
             success: false
             message: Data tidak ditemukan
@@ -147,7 +146,6 @@ components:
 
   # ── Reusable Schemas ────────────────────────────────────────────────────────
   schemas:
-
     # ── Generic Responses ────────────────────────────────────────────────────
     SuccessResponse:
       type: object
@@ -239,12 +237,12 @@ components:
           type: object
           properties:
             user:
-              $ref: '#/components/schemas/UserProfile'
+              $ref: "#/components/schemas/UserProfile"
             tokens:
               description: |
                 Hanya ada di response jika X-Client-Type = mobile.
                 Untuk web, token di-set via httpOnly cookie.
-              $ref: '#/components/schemas/TokenPair'
+              $ref: "#/components/schemas/TokenPair"
 
     TokenPair:
       type: object
@@ -297,7 +295,16 @@ components:
     # ── Reports ──────────────────────────────────────────────────────────────
     CreateReportRequest:
       type: object
-      required: [type, gender, estimated_age, description, last_seen_location, city, province]
+      required:
+        [
+          type,
+          gender,
+          estimated_age,
+          description,
+          last_seen_location,
+          city,
+          province,
+        ]
       properties:
         type:
           type: string
@@ -386,7 +393,7 @@ components:
           type: string
           format: uuid
         reporter:
-          $ref: '#/components/schemas/UserProfile'
+          $ref: "#/components/schemas/UserProfile"
         type:
           type: string
           enum: [found, missing]
@@ -444,9 +451,9 @@ components:
             reports:
               type: array
               items:
-                $ref: '#/components/schemas/Report'
+                $ref: "#/components/schemas/Report"
             meta:
-              $ref: '#/components/schemas/PaginationMeta'
+              $ref: "#/components/schemas/PaginationMeta"
 
     # ── Map ──────────────────────────────────────────────────────────────────
     MapPin:
@@ -494,9 +501,9 @@ components:
           example: 80
           description: "Skor: lokasi(40) + gender(30) + usia(20) + fisik(10)"
         found_report:
-          $ref: '#/components/schemas/Report'
+          $ref: "#/components/schemas/Report"
         missing_report:
-          $ref: '#/components/schemas/Report'
+          $ref: "#/components/schemas/Report"
         notified:
           type: boolean
         created_at:
@@ -527,26 +534,49 @@ components:
           type: string
           format: date-time
 
+    StatsData:
+      type: object
+      properties:
+        active_reports:
+          type: integer
+          format: int64
+          description: Jumlah laporan dengan status active
+          example: 42
+        total_volunteers:
+          type: integer
+          format: int64
+          description: Jumlah user dengan role volunteer
+          example: 8902
+        resolved_last_24h:
+          type: integer
+          format: int64
+          description: Jumlah laporan yang resolved dalam 24 jam terakhir
+          example: 12
+        unique_cities:
+          type: integer
+          format: int64
+          description: Jumlah kota unik dari laporan aktif
+          example: 34
+
 # ═══════════════════════════════════════════════════════════════════════════════
 # PATHS
 # ═══════════════════════════════════════════════════════════════════════════════
 paths:
-
   # ── AUTH ────────────────────────────────────────────────────────────────────
   /auth/register:
     post:
       tags: [Auth]
       summary: Daftar akun baru
       parameters:
-        - $ref: '#/components/parameters/XClientType'
+        - $ref: "#/components/parameters/XClientType"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RegisterRequest'
+              $ref: "#/components/schemas/RegisterRequest"
       responses:
-        '201':
+        "201":
           description: Registrasi berhasil
           headers:
             Set-Cookie:
@@ -559,7 +589,7 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthResponse'
+                $ref: "#/components/schemas/AuthResponse"
               examples:
                 web:
                   summary: Response untuk web (token di cookie)
@@ -587,22 +617,22 @@ paths:
                         access_token: eyJhbGciOiJIUzI1NiIs...
                         refresh_token: eyJhbGciOiJIUzI1NiIs...
                         expires_in: 259200
-        '400':
+        "400":
           description: Validasi gagal
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
               example:
                 success: false
                 message: Format email tidak valid
                 error: validation_error
-        '409':
+        "409":
           description: Email sudah terdaftar
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
               example:
                 success: false
                 message: Email sudah terdaftar
@@ -613,15 +643,15 @@ paths:
       tags: [Auth]
       summary: Login
       parameters:
-        - $ref: '#/components/parameters/XClientType'
+        - $ref: "#/components/parameters/XClientType"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/LoginRequest'
+              $ref: "#/components/schemas/LoginRequest"
       responses:
-        '200':
+        "200":
           description: Login berhasil
           headers:
             Set-Cookie:
@@ -631,13 +661,13 @@ paths:
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/AuthResponse'
-        '401':
+                $ref: "#/components/schemas/AuthResponse"
+        "401":
           description: Email atau password salah
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
               example:
                 success: false
                 message: Email atau password salah
@@ -651,15 +681,15 @@ paths:
         - **Web**: refresh_token dibaca otomatis dari cookie. Body bisa kosong.
         - **Mobile**: kirim `refresh_token` di request body.
       parameters:
-        - $ref: '#/components/parameters/XClientType'
+        - $ref: "#/components/parameters/XClientType"
       requestBody:
         required: false
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/RefreshRequest'
+              $ref: "#/components/schemas/RefreshRequest"
       responses:
-        '200':
+        "200":
           description: Token berhasil diperbarui
           headers:
             Set-Cookie:
@@ -676,13 +706,13 @@ paths:
                   message:
                     type: string
                   data:
-                    $ref: '#/components/schemas/TokenPair'
-        '401':
+                    $ref: "#/components/schemas/TokenPair"
+        "401":
           description: Refresh token tidak valid atau expired
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
               example:
                 success: false
                 message: Sesi telah berakhir, silakan login kembali
@@ -699,14 +729,14 @@ paths:
         - BearerAuth: []
         - CookieAuth: []
       parameters:
-        - $ref: '#/components/parameters/XClientType'
+        - $ref: "#/components/parameters/XClientType"
       responses:
-        '200':
+        "200":
           description: Logout berhasil
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                $ref: "#/components/schemas/SuccessResponse"
               example:
                 success: true
                 message: Logout berhasil
@@ -719,7 +749,7 @@ paths:
         - BearerAuth: []
         - CookieAuth: []
       responses:
-        '200':
+        "200":
           description: Data profil user
           content:
             application/json:
@@ -729,9 +759,9 @@ paths:
                   success:
                     type: boolean
                   data:
-                    $ref: '#/components/schemas/UserProfile'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
+                    $ref: "#/components/schemas/UserProfile"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 
   # ── REPORTS ─────────────────────────────────────────────────────────────────
   /reports:
@@ -784,15 +814,15 @@ paths:
           schema:
             type: string
           example: batik biru
-        - $ref: '#/components/parameters/PageParam'
-        - $ref: '#/components/parameters/LimitParam'
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
       responses:
-        '200':
+        "200":
           description: List laporan berhasil diambil
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ReportListResponse'
+                $ref: "#/components/schemas/ReportListResponse"
 
     post:
       tags: [Reports]
@@ -805,9 +835,9 @@ paths:
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/CreateReportRequest'
+              $ref: "#/components/schemas/CreateReportRequest"
       responses:
-        '201':
+        "201":
           description: Laporan berhasil dibuat
           content:
             application/json:
@@ -820,15 +850,15 @@ paths:
                     type: string
                     example: Laporan berhasil dibuat
                   data:
-                    $ref: '#/components/schemas/Report'
-        '400':
+                    $ref: "#/components/schemas/Report"
+        "400":
           description: Validasi gagal
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
+                $ref: "#/components/schemas/ErrorResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 
   /reports/my:
     get:
@@ -841,26 +871,26 @@ paths:
         - BearerAuth: []
         - CookieAuth: []
       parameters:
-        - $ref: '#/components/parameters/PageParam'
-        - $ref: '#/components/parameters/LimitParam'
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
       responses:
-        '200':
+        "200":
           description: List laporan milik saya
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ReportListResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
+                $ref: "#/components/schemas/ReportListResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 
   /reports/{id}:
     get:
       tags: [Reports]
       summary: Detail satu laporan
       parameters:
-        - $ref: '#/components/parameters/ReportId'
+        - $ref: "#/components/parameters/ReportId"
       responses:
-        '200':
+        "200":
           description: Detail laporan
           content:
             application/json:
@@ -870,13 +900,13 @@ paths:
                   success:
                     type: boolean
                   data:
-                    $ref: '#/components/schemas/Report'
-        '404':
+                    $ref: "#/components/schemas/Report"
+        "404":
           description: Laporan tidak ditemukan
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
               example:
                 success: false
                 message: Laporan tidak ditemukan
@@ -889,15 +919,15 @@ paths:
         - BearerAuth: []
         - CookieAuth: []
       parameters:
-        - $ref: '#/components/parameters/ReportId'
+        - $ref: "#/components/parameters/ReportId"
       requestBody:
         required: true
         content:
           application/json:
             schema:
-              $ref: '#/components/schemas/UpdateReportRequest'
+              $ref: "#/components/schemas/UpdateReportRequest"
       responses:
-        '200':
+        "200":
           description: Laporan berhasil diupdate
           content:
             application/json:
@@ -910,13 +940,13 @@ paths:
                     type: string
                     example: Laporan berhasil diperbarui
                   data:
-                    $ref: '#/components/schemas/Report'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
+                    $ref: "#/components/schemas/Report"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
     delete:
       tags: [Reports]
@@ -925,23 +955,23 @@ paths:
         - BearerAuth: []
         - CookieAuth: []
       parameters:
-        - $ref: '#/components/parameters/ReportId'
+        - $ref: "#/components/parameters/ReportId"
       responses:
-        '200':
+        "200":
           description: Laporan berhasil dihapus
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                $ref: "#/components/schemas/SuccessResponse"
               example:
                 success: true
                 message: Laporan berhasil dihapus
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   /reports/{id}/photo:
     post:
@@ -955,7 +985,7 @@ paths:
         - BearerAuth: []
         - CookieAuth: []
       parameters:
-        - $ref: '#/components/parameters/ReportId'
+        - $ref: "#/components/parameters/ReportId"
       requestBody:
         required: true
         content:
@@ -968,7 +998,7 @@ paths:
                   type: string
                   format: binary
       responses:
-        '200':
+        "200":
           description: Foto berhasil diupload
           content:
             application/json:
@@ -986,24 +1016,24 @@ paths:
                       photo_url:
                         type: string
                         example: https://res.cloudinary.com/temukan/image/upload/v1/reports/abc.jpg
-        '400':
+        "400":
           description: File tidak valid
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
               example:
                 success: false
                 message: Format file tidak didukung. Gunakan jpg, png, atau webp.
                 error: invalid_file_format
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '413':
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "413":
           description: Ukuran file terlalu besar
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/ErrorResponse'
+                $ref: "#/components/schemas/ErrorResponse"
               example:
                 success: false
                 message: Ukuran file maksimal 5MB
@@ -1034,7 +1064,7 @@ paths:
             type: string
           example: "3.4,98.5,3.7,98.8"
       responses:
-        '200':
+        "200":
           description: List pin berhasil diambil
           content:
             application/json:
@@ -1049,7 +1079,7 @@ paths:
                       pins:
                         type: array
                         items:
-                          $ref: '#/components/schemas/MapPin'
+                          $ref: "#/components/schemas/MapPin"
                       total:
                         type: integer
                         example: 42
@@ -1074,10 +1104,10 @@ paths:
             maximum: 100
             default: 60
           description: Filter match dengan skor minimal
-        - $ref: '#/components/parameters/PageParam'
-        - $ref: '#/components/parameters/LimitParam'
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
       responses:
-        '200':
+        "200":
           description: List match berhasil diambil
           content:
             application/json:
@@ -1092,11 +1122,11 @@ paths:
                       matches:
                         type: array
                         items:
-                          $ref: '#/components/schemas/Match'
+                          $ref: "#/components/schemas/Match"
                       meta:
-                        $ref: '#/components/schemas/PaginationMeta'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
+                        $ref: "#/components/schemas/PaginationMeta"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 
   /matches/{id}:
     get:
@@ -1113,7 +1143,7 @@ paths:
             type: string
             format: uuid
       responses:
-        '200':
+        "200":
           description: Detail match
           content:
             application/json:
@@ -1123,13 +1153,13 @@ paths:
                   success:
                     type: boolean
                   data:
-                    $ref: '#/components/schemas/Match'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '403':
-          $ref: '#/components/responses/Forbidden'
-        '404':
-          $ref: '#/components/responses/NotFound'
+                    $ref: "#/components/schemas/Match"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "403":
+          $ref: "#/components/responses/Forbidden"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   # ── NOTIFICATIONS ────────────────────────────────────────────────────────────
   /notifications:
@@ -1145,10 +1175,10 @@ paths:
           schema:
             type: boolean
           description: Filter notifikasi sudah/belum dibaca
-        - $ref: '#/components/parameters/PageParam'
-        - $ref: '#/components/parameters/LimitParam'
+        - $ref: "#/components/parameters/PageParam"
+        - $ref: "#/components/parameters/LimitParam"
       responses:
-        '200':
+        "200":
           description: List notifikasi
           content:
             application/json:
@@ -1163,15 +1193,15 @@ paths:
                       notifications:
                         type: array
                         items:
-                          $ref: '#/components/schemas/Notification'
+                          $ref: "#/components/schemas/Notification"
                       unread_count:
                         type: integer
                         description: Jumlah notifikasi belum dibaca (untuk badge)
                         example: 3
                       meta:
-                        $ref: '#/components/schemas/PaginationMeta'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
+                        $ref: "#/components/schemas/PaginationMeta"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 
   /notifications/read-all:
     patch:
@@ -1184,17 +1214,17 @@ paths:
         - BearerAuth: []
         - CookieAuth: []
       responses:
-        '200':
+        "200":
           description: Semua notifikasi ditandai sudah dibaca
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
+                $ref: "#/components/schemas/SuccessResponse"
               example:
                 success: true
                 message: Semua notifikasi telah ditandai dibaca
-        '401':
-          $ref: '#/components/responses/Unauthorized'
+        "401":
+          $ref: "#/components/responses/Unauthorized"
 
   /notifications/{id}/read:
     patch:
@@ -1211,16 +1241,16 @@ paths:
             type: string
             format: uuid
       responses:
-        '200':
+        "200":
           description: Notifikasi ditandai sudah dibaca
           content:
             application/json:
               schema:
-                $ref: '#/components/schemas/SuccessResponse'
-        '401':
-          $ref: '#/components/responses/Unauthorized'
-        '404':
-          $ref: '#/components/responses/NotFound'
+                $ref: "#/components/schemas/SuccessResponse"
+        "401":
+          $ref: "#/components/responses/Unauthorized"
+        "404":
+          $ref: "#/components/responses/NotFound"
 
   # ── HEALTH CHECK ─────────────────────────────────────────────────────────────
   /health:
@@ -1229,7 +1259,7 @@ paths:
       summary: Health check server
       description: Dipakai Render/Vercel untuk cek apakah server hidup.
       responses:
-        '200':
+        "200":
           description: Server berjalan normal
           content:
             application/json:
@@ -1251,3 +1281,40 @@ paths:
                       env:
                         type: string
                         example: production
+
+  /stats:
+    get:
+      tags: [Stats]
+      summary: Ambil statistik platform (publik)
+      description: |
+        Mengembalikan 4 angka yang ditampilkan di StatCard homepage:
+        - **active_reports** — laporan dengan `status = active`
+        - **total_volunteers** — user dengan `role = volunteer`
+        - **resolved_last_24h** — laporan resolved dalam 24 jam terakhir
+        - **unique_cities** — jumlah kota unik dari laporan aktif
+
+        Endpoint ini **tidak memerlukan autentikasi**.
+      responses:
+        "200":
+          description: Statistik berhasil diambil
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                    example: true
+                  message:
+                    type: string
+                    example: OK
+                  data:
+                    $ref: "#/components/schemas/StatsData"
+              example:
+                success: true
+                message: OK
+                data:
+                  active_reports: 42
+                  total_volunteers: 8902
+                  resolved_last_24h: 12
+                  unique_cities: 34
