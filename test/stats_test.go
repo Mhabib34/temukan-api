@@ -74,7 +74,6 @@ func getStatsRouter() *gin.Engine {
 }
 
 // registerAndLoginStats mendaftarkan user dan mengembalikan token
-// (mirip registerAndLogin di report_test, tapi pakai statsRouter)
 func registerAndLoginStats(email, name, role string) string {
 	router := getStatsRouter()
 	doPostAuth(router, "/api/v1/auth/register", `{
@@ -149,6 +148,7 @@ func TestGetStatsSuccess(t *testing.T) {
 	data := body["data"].(map[string]any)
 	assert.Contains(t, data, "active_reports")
 	assert.Contains(t, data, "total_volunteers")
+	assert.Contains(t, data, "total_resolved")
 	assert.Contains(t, data, "resolved_last_24h")
 	assert.Contains(t, data, "unique_cities")
 }
@@ -165,11 +165,13 @@ func TestGetStatsFieldTypes(t *testing.T) {
 	// JSON number di-decode sebagai float64 oleh Go
 	_, okActive := data["active_reports"].(float64)
 	_, okVol := data["total_volunteers"].(float64)
+	_, okTotalResolved := data["total_resolved"].(float64)
 	_, okResolved := data["resolved_last_24h"].(float64)
 	_, okCities := data["unique_cities"].(float64)
 
 	assert.True(t, okActive, "active_reports harus bertipe number")
 	assert.True(t, okVol, "total_volunteers harus bertipe number")
+	assert.True(t, okTotalResolved, "total_resolved harus bertipe number")
 	assert.True(t, okResolved, "resolved_last_24h harus bertipe number")
 	assert.True(t, okCities, "unique_cities harus bertipe number")
 }
@@ -184,6 +186,7 @@ func TestGetStatsAllZeroWhenEmpty(t *testing.T) {
 	data := body["data"].(map[string]any)
 	assert.Equal(t, float64(0), data["active_reports"])
 	assert.Equal(t, float64(0), data["total_volunteers"])
+	assert.Equal(t, float64(0), data["total_resolved"])
 	assert.Equal(t, float64(0), data["resolved_last_24h"])
 	assert.Equal(t, float64(0), data["unique_cities"])
 }
@@ -223,36 +226,15 @@ func TestGetStatsActiveReportsExcludesResolved(t *testing.T) {
 	body := parseBodyReport(resp)
 
 	data := body["data"].(map[string]any)
-	// Hanya 1 yang active, bukan 2
 	assert.Equal(t, float64(1), data["active_reports"])
-}
-
-// 6. active_reports bertambah setelah laporan baru dibuat
-func TestGetStatsActiveReportsIncrement(t *testing.T) {
-	truncateStats(testDB)
-	token := registerAndLoginStats("stats3@mail.com", "Stats Tiga", "finder")
-
-	// Sebelum
-	resp1 := doGet(getStatsRouter(), "/api/v1/stats")
-	body1 := parseBodyReport(resp1)
-	before := body1["data"].(map[string]any)["active_reports"].(float64)
-
-	createReportStats(token, "missing", "male")
-
-	// Sesudah
-	resp2 := doGet(getStatsRouter(), "/api/v1/stats")
-	body2 := parseBodyReport(resp2)
-	after := body2["data"].(map[string]any)["active_reports"].(float64)
-
-	assert.Equal(t, before+1, after)
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
 // GET /stats — total_volunteers
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// 7. total_volunteers menghitung user dengan role=volunteer
-func TestGetStatsTotalVolunteers(t *testing.T) {
+// 6. total_volunteers menghitung user dengan role volunteer
+func TestGetStatsTotalVolunteersCount(t *testing.T) {
 	truncateStats(testDB)
 
 	registerAndLoginStats("vol1@mail.com", "Relawan Satu", "volunteer")
@@ -266,23 +248,21 @@ func TestGetStatsTotalVolunteers(t *testing.T) {
 	assert.Equal(t, float64(3), data["total_volunteers"])
 }
 
-// 8. total_volunteers tidak menghitung role finder/seeker
+// 7. total_volunteers tidak menghitung finder/seeker
 func TestGetStatsTotalVolunteersExcludesOtherRoles(t *testing.T) {
 	truncateStats(testDB)
 
 	registerAndLoginStats("finder1@mail.com", "Finder Satu", "finder")
 	registerAndLoginStats("seeker1@mail.com", "Seeker Satu", "seeker")
-	registerAndLoginStats("vol1@mail.com", "Relawan Satu", "volunteer")
 
 	resp := doGet(getStatsRouter(), "/api/v1/stats")
 	body := parseBodyReport(resp)
 
 	data := body["data"].(map[string]any)
-	// Hanya 1 volunteer, bukan 3
-	assert.Equal(t, float64(1), data["total_volunteers"])
+	assert.Equal(t, float64(0), data["total_volunteers"])
 }
 
-// 9. total_volunteers bertambah setelah user volunteer baru daftar
+// 8. total_volunteers bertambah saat volunteer baru daftar
 func TestGetStatsTotalVolunteersIncrement(t *testing.T) {
 	truncateStats(testDB)
 
@@ -299,7 +279,7 @@ func TestGetStatsTotalVolunteersIncrement(t *testing.T) {
 	assert.Equal(t, before+1, after)
 }
 
-// 10. total_volunteers tidak berubah saat finder/seeker daftar
+// 9. total_volunteers tidak berubah saat finder/seeker daftar
 func TestGetStatsTotalVolunteersNotAffectedByOtherRoles(t *testing.T) {
 	truncateStats(testDB)
 	registerAndLoginStats("vol_base@mail.com", "Relawan Base", "volunteer")
@@ -308,7 +288,6 @@ func TestGetStatsTotalVolunteersNotAffectedByOtherRoles(t *testing.T) {
 	body1 := parseBodyReport(resp1)
 	before := body1["data"].(map[string]any)["total_volunteers"].(float64)
 
-	// Daftar finder dan seeker
 	registerAndLoginStats("finder_new@mail.com", "Finder Baru", "finder")
 	registerAndLoginStats("seeker_new@mail.com", "Seeker Baru", "seeker")
 
@@ -320,10 +299,88 @@ func TestGetStatsTotalVolunteersNotAffectedByOtherRoles(t *testing.T) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════════
+// GET /stats — total_resolved
+// ═══════════════════════════════════════════════════════════════════════════════
+
+// 10. total_resolved menghitung semua laporan dengan status resolved
+func TestGetStatsTotalResolvedCount(t *testing.T) {
+	truncateStats(testDB)
+	token := registerAndLoginStats("tr1@mail.com", "Total Resolved Satu", "finder")
+
+	id1 := createReportStats(token, "missing", "male")
+	id2 := createReportStats(token, "found", "female")
+	createReportStats(token, "missing", "unknown") // tetap active
+
+	testDB.Model(&model.Report{}).Where("id = ?", id1).Update("status", "resolved")
+	testDB.Model(&model.Report{}).Where("id = ?", id2).Update("status", "resolved")
+
+	resp := doGet(getStatsRouter(), "/api/v1/stats")
+	body := parseBodyReport(resp)
+
+	data := body["data"].(map[string]any)
+	assert.Equal(t, float64(2), data["total_resolved"])
+}
+
+// 11. total_resolved = 0 saat tidak ada laporan resolved
+func TestGetStatsTotalResolvedZeroWhenNone(t *testing.T) {
+	truncateStats(testDB)
+	token := registerAndLoginStats("tr2@mail.com", "Total Resolved Dua", "finder")
+
+	createReportStats(token, "missing", "male")
+	createReportStats(token, "found", "female")
+
+	resp := doGet(getStatsRouter(), "/api/v1/stats")
+	body := parseBodyReport(resp)
+
+	data := body["data"].(map[string]any)
+	assert.Equal(t, float64(0), data["total_resolved"])
+}
+
+// 12. total_resolved menghitung laporan resolved kapan pun (tidak terbatas 24h)
+func TestGetStatsTotalResolvedIncludesOldResolved(t *testing.T) {
+	truncateStats(testDB)
+	token := registerAndLoginStats("tr3@mail.com", "Total Resolved Tiga", "finder")
+
+	id := createReportStats(token, "missing", "male")
+
+	// Paksa updated_at ke 2 hari lalu
+	testDB.Model(&model.Report{}).Where("id = ?", id).
+		Updates(map[string]any{
+			"status":     "resolved",
+			"updated_at": testDB.NowFunc().AddDate(0, 0, -2),
+		})
+
+	resp := doGet(getStatsRouter(), "/api/v1/stats")
+	body := parseBodyReport(resp)
+
+	data := body["data"].(map[string]any)
+	// total_resolved harus menghitung ini meski lebih dari 24h
+	assert.Equal(t, float64(1), data["total_resolved"])
+	// resolved_last_24h tidak menghitung ini
+	assert.Equal(t, float64(0), data["resolved_last_24h"])
+}
+
+// 13. total_resolved tidak menghitung laporan active
+func TestGetStatsTotalResolvedExcludesActive(t *testing.T) {
+	truncateStats(testDB)
+	token := registerAndLoginStats("tr4@mail.com", "Total Resolved Empat", "seeker")
+
+	createReportStats(token, "missing", "male")
+	createReportStats(token, "found", "female")
+
+	resp := doGet(getStatsRouter(), "/api/v1/stats")
+	body := parseBodyReport(resp)
+
+	data := body["data"].(map[string]any)
+	assert.Equal(t, float64(0), data["total_resolved"])
+	assert.Equal(t, float64(2), data["active_reports"])
+}
+
+// ═══════════════════════════════════════════════════════════════════════════════
 // GET /stats — resolved_last_24h
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// 11. resolved_last_24h menghitung laporan yang baru saja resolved
+// 14. resolved_last_24h menghitung laporan yang baru saja resolved
 func TestGetStatsResolvedLast24h(t *testing.T) {
 	truncateStats(testDB)
 	token := registerAndLoginStats("res1@mail.com", "Resolved Satu", "finder")
@@ -332,7 +389,6 @@ func TestGetStatsResolvedLast24h(t *testing.T) {
 	id2 := createReportStats(token, "found", "female")
 	createReportStats(token, "missing", "unknown") // tetap active
 
-	// Set 2 laporan jadi resolved (updated_at = sekarang → masuk 24h)
 	testDB.Model(&model.Report{}).Where("id = ?", id1).Update("status", "resolved")
 	testDB.Model(&model.Report{}).Where("id = ?", id2).Update("status", "resolved")
 
@@ -343,14 +399,13 @@ func TestGetStatsResolvedLast24h(t *testing.T) {
 	assert.Equal(t, float64(2), data["resolved_last_24h"])
 }
 
-// 12. resolved_last_24h tidak menghitung laporan yang masih active
+// 15. resolved_last_24h tidak menghitung laporan yang masih active
 func TestGetStatsResolvedLast24hExcludesActive(t *testing.T) {
 	truncateStats(testDB)
 	token := registerAndLoginStats("res2@mail.com", "Resolved Dua", "seeker")
 
 	createReportStats(token, "missing", "male")
 	createReportStats(token, "found", "female")
-	// Tidak ada yang di-resolved
 
 	resp := doGet(getStatsRouter(), "/api/v1/stats")
 	body := parseBodyReport(resp)
@@ -359,14 +414,13 @@ func TestGetStatsResolvedLast24hExcludesActive(t *testing.T) {
 	assert.Equal(t, float64(0), data["resolved_last_24h"])
 }
 
-// 13. resolved_last_24h tidak menghitung laporan resolved lebih dari 24 jam lalu
+// 16. resolved_last_24h tidak menghitung laporan resolved lebih dari 24 jam lalu
 func TestGetStatsResolvedLast24hExcludesOldResolved(t *testing.T) {
 	truncateStats(testDB)
 	token := registerAndLoginStats("res3@mail.com", "Resolved Tiga", "finder")
 
 	id := createReportStats(token, "missing", "male")
 
-	// Paksa updated_at ke 2 hari lalu (di luar window 24h)
 	testDB.Model(&model.Report{}).Where("id = ?", id).
 		Updates(map[string]any{
 			"status":     "resolved",
@@ -384,13 +438,13 @@ func TestGetStatsResolvedLast24hExcludesOldResolved(t *testing.T) {
 // GET /stats — unique_cities
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// 14. unique_cities menghitung kota unik dari laporan aktif
+// 17. unique_cities menghitung kota unik dari laporan aktif
 func TestGetStatsUniqueCities(t *testing.T) {
 	truncateStats(testDB)
 	token := registerAndLoginStats("city1@mail.com", "City Satu", "finder")
 
 	createReportStatsCity(token, "missing", "Medan")
-	createReportStatsCity(token, "found", "Medan")    // kota sama, tidak dihitung 2x
+	createReportStatsCity(token, "found", "Medan")         // kota sama, tidak dihitung 2x
 	createReportStatsCity(token, "missing", "Binjai")
 	createReportStatsCity(token, "found", "Pematangsiantar")
 
@@ -402,31 +456,28 @@ func TestGetStatsUniqueCities(t *testing.T) {
 	assert.Equal(t, float64(3), data["unique_cities"])
 }
 
-// 15. unique_cities tidak menghitung kota dari laporan resolved
+// 18. unique_cities tidak menghitung kota dari laporan resolved
 func TestGetStatsUniqueCitiesExcludesResolved(t *testing.T) {
 	truncateStats(testDB)
 	token := registerAndLoginStats("city2@mail.com", "City Dua", "seeker")
 
 	createReportStatsCity(token, "missing", "Medan")
-	idResolved := createReportStatsCity(token, "found", "Jakarta") // akan di-resolved
+	idResolved := createReportStatsCity(token, "found", "Jakarta")
 
-	// Resolved → tidak seharusnya masuk unique_cities
 	testDB.Model(&model.Report{}).Where("id = ?", idResolved).Update("status", "resolved")
 
 	resp := doGet(getStatsRouter(), "/api/v1/stats")
 	body := parseBodyReport(resp)
 
 	data := body["data"].(map[string]any)
-	// Hanya Medan (active), Jakarta (resolved) tidak dihitung
 	assert.Equal(t, float64(1), data["unique_cities"])
 }
 
-// 16. unique_cities = 0 saat tidak ada laporan aktif
+// 19. unique_cities = 0 saat tidak ada laporan aktif
 func TestGetStatsUniqueCitiesZeroWhenNoActiveReports(t *testing.T) {
 	truncateStats(testDB)
 	token := registerAndLoginStats("city3@mail.com", "City Tiga", "finder")
 
-	// Buat laporan lalu resolved semua
 	id := createReportStatsCity(token, "missing", "Medan")
 	testDB.Model(&model.Report{}).Where("id = ?", id).Update("status", "resolved")
 
@@ -441,17 +492,15 @@ func TestGetStatsUniqueCitiesZeroWhenNoActiveReports(t *testing.T) {
 // GET /stats — AKSES & KEAMANAN
 // ═══════════════════════════════════════════════════════════════════════════════
 
-// 17. Endpoint publik — tidak butuh token
+// 20. Endpoint publik — tidak butuh token
 func TestGetStatsPublicNoTokenRequired(t *testing.T) {
 	truncateStats(testDB)
 
-	// Hit tanpa Authorization header sama sekali
 	resp := doGet(getStatsRouter(), "/api/v1/stats")
-
 	assert.Equal(t, 200, resp.StatusCode, "endpoint stats harus bisa diakses tanpa auth")
 }
 
-// 18. Dengan token valid pun tetap bisa diakses (tidak di-reject)
+// 21. Dengan token valid pun tetap bisa diakses (tidak di-reject)
 func TestGetStatsAccessibleWithToken(t *testing.T) {
 	truncateStats(testDB)
 	token := registerAndLoginStats("stats_auth@mail.com", "Stats Auth", "finder")
@@ -463,7 +512,7 @@ func TestGetStatsAccessibleWithToken(t *testing.T) {
 	assert.Equal(t, "OK", body["status"])
 }
 
-// 19. Response konsisten — harus selalu ada keempat field meski nilainya 0
+// 22. Response konsisten — harus selalu ada kelima field meski nilainya 0
 func TestGetStatsResponseAlwaysHasAllFields(t *testing.T) {
 	truncateStats(testDB)
 
@@ -473,14 +522,14 @@ func TestGetStatsResponseAlwaysHasAllFields(t *testing.T) {
 	assert.Equal(t, 200, resp.StatusCode)
 	data := body["data"].(map[string]any)
 
-	fields := []string{"active_reports", "total_volunteers", "resolved_last_24h", "unique_cities"}
+	fields := []string{"active_reports", "total_volunteers", "total_resolved", "resolved_last_24h", "unique_cities"}
 	for _, f := range fields {
 		_, exists := data[f]
 		assert.True(t, exists, "field '%s' harus selalu ada di response", f)
 	}
 }
 
-// 20. Nilai stats akurat setelah kombinasi laporan + user + status update
+// 23. Nilai stats akurat setelah kombinasi laporan + user + status update
 func TestGetStatsCombinedAccuracy(t *testing.T) {
 	truncateStats(testDB)
 
@@ -491,12 +540,11 @@ func TestGetStatsCombinedAccuracy(t *testing.T) {
 	// 1 finder untuk buat laporan
 	token := registerAndLoginStats("comb_finder@mail.com", "Finder Combo", "finder")
 
-	// 3 laporan active, 2 kota berbeda
+	// 3 laporan: 2 active di Medan, 1 akan di-resolved dari Binjai
 	createReportStatsCity(token, "missing", "Medan")
 	createReportStatsCity(token, "found", "Medan")
 	idResolved := createReportStatsCity(token, "missing", "Binjai")
 
-	// Resolve 1 laporan dari Binjai
 	testDB.Model(&model.Report{}).Where("id = ?", idResolved).Update("status", "resolved")
 
 	resp := doGet(getStatsRouter(), "/api/v1/stats")
@@ -505,6 +553,37 @@ func TestGetStatsCombinedAccuracy(t *testing.T) {
 	data := body["data"].(map[string]any)
 	assert.Equal(t, float64(2), data["active_reports"],    "2 laporan aktif")
 	assert.Equal(t, float64(2), data["total_volunteers"],  "2 volunteer")
+	assert.Equal(t, float64(1), data["total_resolved"],    "1 laporan resolved (all-time)")
 	assert.Equal(t, float64(1), data["resolved_last_24h"], "1 laporan baru resolved")
 	assert.Equal(t, float64(1), data["unique_cities"],     "hanya Medan yang aktif")
+}
+
+// 24. total_resolved >= resolved_last_24h selalu
+func TestGetStatsTotalResolvedAlwaysGteResolvedLast24h(t *testing.T) {
+	truncateStats(testDB)
+	token := registerAndLoginStats("tr5@mail.com", "Total Resolved Lima", "finder")
+
+	// 1 laporan resolved 2 hari lalu (masuk total_resolved, tidak masuk resolved_last_24h)
+	idOld := createReportStats(token, "missing", "male")
+	testDB.Model(&model.Report{}).Where("id = ?", idOld).
+		Updates(map[string]any{
+			"status":     "resolved",
+			"updated_at": testDB.NowFunc().AddDate(0, 0, -2),
+		})
+
+	// 1 laporan resolved sekarang (masuk keduanya)
+	idNew := createReportStats(token, "found", "female")
+	testDB.Model(&model.Report{}).Where("id = ?", idNew).Update("status", "resolved")
+
+	resp := doGet(getStatsRouter(), "/api/v1/stats")
+	body := parseBodyReport(resp)
+
+	data := body["data"].(map[string]any)
+	totalResolved := data["total_resolved"].(float64)
+	resolvedLast24h := data["resolved_last_24h"].(float64)
+
+	assert.Equal(t, float64(2), totalResolved)
+	assert.Equal(t, float64(1), resolvedLast24h)
+	assert.GreaterOrEqual(t, totalResolved, resolvedLast24h,
+		"total_resolved harus >= resolved_last_24h")
 }

@@ -52,3 +52,12 @@ func (s *StatsRepositoryImpl) CountUniqueCities(ctx context.Context) (int64, err
 		Count(&count).Error
 	return count, err
 }
+
+func (s *StatsRepositoryImpl) CountTotalResolved(ctx context.Context) (int64, error) {
+	var count int64
+	err := s.DB.WithContext(ctx).
+		Table("reports").
+		Where("status = ?", "resolved").
+		Count(&count).Error
+	return count, err
+}
