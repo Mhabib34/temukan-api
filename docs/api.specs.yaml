@@ -557,6 +557,11 @@ components:
           format: int64
           description: Jumlah kota unik dari laporan aktif
           example: 34
+        total_resolved:
+          type: integer
+          format: int64
+          description: Jumlah laporan yang resolved
+          example: 120
 
 # ═══════════════════════════════════════════════════════════════════════════════
 # PATHS
@@ -1292,6 +1297,7 @@ paths:
         - **total_volunteers** — user dengan `role = volunteer`
         - **resolved_last_24h** — laporan resolved dalam 24 jam terakhir
         - **unique_cities** — jumlah kota unik dari laporan aktif
+        - **total_resolved** — laporan yang resolved secara keseluruhan
 
         Endpoint ini **tidak memerlukan autentikasi**.
       responses:
@@ -1318,3 +1324,4 @@ paths:
                   total_volunteers: 8902
                   resolved_last_24h: 12
                   unique_cities: 34
+                  total_resolved: 120

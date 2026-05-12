@@ -28,10 +28,14 @@ func (s *StatsUsecaseImpl) GetStats(ctx context.Context) (*dto.StatsData, error)
 	uniqueCities, err := s.repo.CountUniqueCities(ctx)
 	exception.PanicIfError(err)
 
+	countTotalResolved, err := s.repo.CountTotalResolved(ctx)
+	exception.PanicIfError(err)
+
 	return &dto.StatsData{
 		ActiveReports:   activeReports,
 		TotalVolunteers: volunteers,
 		ResolvedLast24h: resolvedLast24h,
 		UniqueCities:    uniqueCities,
+		TotalResolved:   countTotalResolved,
 	}, nil
 }

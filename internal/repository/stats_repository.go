@@ -7,4 +7,5 @@ type StatsRepository interface {
 	CountVolunteers(ctx context.Context) (int64, error)
 	CountResolvedLast24h(ctx context.Context) (int64, error)
 	CountUniqueCities(ctx context.Context) (int64, error)
+	CountTotalResolved(ctx context.Context) (int64, error)
 }
