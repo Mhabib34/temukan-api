@@ -1,7 +1,7 @@
 package config
 
 import (
-	"temukan-api/internal/logger"
+	"titip-jejak-api/internal/logger"
 
 	"gorm.io/driver/postgres"
 	"gorm.io/gorm"

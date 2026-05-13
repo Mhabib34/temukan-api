@@ -2,7 +2,7 @@ package usecase
 
 import (
 	"context"
-	"temukan-api/internal/dto"
+	"titip-jejak-api/internal/dto"
 )
 
 type UserUsecase interface {

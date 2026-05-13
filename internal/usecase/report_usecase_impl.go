@@ -3,12 +3,12 @@ package usecase
 import (
 	"context"
 	"mime/multipart"
-	"temukan-api/internal/dto"
-	"temukan-api/internal/exception"
-	"temukan-api/internal/helper"
-	"temukan-api/internal/model"
-	"temukan-api/internal/repository"
-	"temukan-api/internal/worker"
+	"titip-jejak-api/internal/dto"
+	"titip-jejak-api/internal/exception"
+	"titip-jejak-api/internal/helper"
+	"titip-jejak-api/internal/model"
+	"titip-jejak-api/internal/repository"
+	"titip-jejak-api/internal/worker"
 
 	"github.com/cloudinary/cloudinary-go/v2"
 	"github.com/go-playground/validator/v10"

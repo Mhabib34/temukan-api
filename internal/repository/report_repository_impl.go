@@ -4,8 +4,8 @@ import (
 	"context"
 	"fmt"
 	"strings"
-	"temukan-api/internal/dto"
-	"temukan-api/internal/model"
+	"titip-jejak-api/internal/dto"
+	"titip-jejak-api/internal/model"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"

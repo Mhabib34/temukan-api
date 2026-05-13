@@ -2,9 +2,9 @@ package usecase
 
 import (
 	"context"
-	"temukan-api/internal/dto"
-	"temukan-api/internal/exception"
-	"temukan-api/internal/repository"
+	"titip-jejak-api/internal/dto"
+	"titip-jejak-api/internal/exception"
+	"titip-jejak-api/internal/repository"
 )
 
 type StatsUsecaseImpl struct {

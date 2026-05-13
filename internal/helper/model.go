@@ -3,8 +3,8 @@ package helper
 import (
 	"fmt"
 	"net/url"
-	"temukan-api/internal/dto"
-	"temukan-api/internal/model"
+	"titip-jejak-api/internal/dto"
+	"titip-jejak-api/internal/model"
 )
 
 func ToUserResponse(user model.User) *dto.UserResponse {

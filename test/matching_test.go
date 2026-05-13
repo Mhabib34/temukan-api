@@ -4,8 +4,8 @@ import (
 	"testing"
 	"time"
 
-	"temukan-api/internal/model"
-	"temukan-api/internal/service"
+	"titip-jejak-api/internal/model"
+	"titip-jejak-api/internal/service"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"

@@ -7,15 +7,15 @@ import (
 	"net/http/httptest"
 	"os"
 	"strings"
-	"temukan-api/internal/middleware"
+	"titip-jejak-api/internal/middleware"
 	"testing"
 	"time"
 
-	"temukan-api/internal/handler"
-	"temukan-api/internal/helper"
-	"temukan-api/internal/model"
-	"temukan-api/internal/repository"
-	"temukan-api/internal/usecase"
+	"titip-jejak-api/internal/handler"
+	"titip-jejak-api/internal/helper"
+	"titip-jejak-api/internal/model"
+	"titip-jejak-api/internal/repository"
+	"titip-jejak-api/internal/usecase"
 
 	"fmt"
 

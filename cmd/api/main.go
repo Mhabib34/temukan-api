@@ -6,8 +6,8 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"temukan-api/cmd/wire"
-	"temukan-api/internal/logger"
+	"titip-jejak-api/cmd/wire"
+	"titip-jejak-api/internal/logger"
 
 	"time"
 )

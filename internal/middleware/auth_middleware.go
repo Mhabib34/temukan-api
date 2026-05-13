@@ -3,8 +3,8 @@ package middleware
 import (
 	"fmt"
 	"strings"
-	"temukan-api/internal/exception"
-	"temukan-api/internal/helper"
+	"titip-jejak-api/internal/exception"
+	"titip-jejak-api/internal/helper"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
