@@ -4,13 +4,13 @@ import (
 	"context"
 	"fmt"
 	"net/http"
-	"temukan-api/internal/worker"
+	"titip-jejak-api/internal/worker"
 	"testing"
 
-	"temukan-api/internal/handler"
-	"temukan-api/internal/middleware"
-	"temukan-api/internal/repository"
-	"temukan-api/internal/usecase"
+	"titip-jejak-api/internal/handler"
+	"titip-jejak-api/internal/middleware"
+	"titip-jejak-api/internal/repository"
+	"titip-jejak-api/internal/usecase"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"

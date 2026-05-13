@@ -2,7 +2,7 @@ package service
 
 import (
 	"strings"
-	"temukan-api/internal/model"
+	"titip-jejak-api/internal/model"
 )
 
 const MinMatchScore = 60

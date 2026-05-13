@@ -3,9 +3,9 @@ package router
 import (
 	"os"
 	"strings"
-	"temukan-api/internal/handler"
-	"temukan-api/internal/logger"
-	"temukan-api/internal/middleware"
+	"titip-jejak-api/internal/handler"
+	"titip-jejak-api/internal/logger"
+	"titip-jejak-api/internal/middleware"
 
 	"github.com/gin-gonic/gin"
 )

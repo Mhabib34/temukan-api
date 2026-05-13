@@ -3,10 +3,10 @@ package handler
 import (
 	"net/http"
 	"strconv"
-	"temukan-api/internal/dto"
-	"temukan-api/internal/exception"
-	"temukan-api/internal/helper"
-	"temukan-api/internal/usecase"
+	"titip-jejak-api/internal/dto"
+	"titip-jejak-api/internal/exception"
+	"titip-jejak-api/internal/helper"
+	"titip-jejak-api/internal/usecase"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"

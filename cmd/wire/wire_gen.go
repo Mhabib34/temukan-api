@@ -14,14 +14,14 @@ import (
 	"github.com/google/wire"
 	"os"
 	"strconv"
-	"temukan-api/config"
-	"temukan-api/internal/handler"
-	"temukan-api/internal/logger"
-	"temukan-api/internal/repository"
-	"temukan-api/internal/router"
-	"temukan-api/internal/service"
-	"temukan-api/internal/usecase"
-	"temukan-api/internal/worker"
+	"titip-jejak-api/config"
+	"titip-jejak-api/internal/handler"
+	"titip-jejak-api/internal/logger"
+	"titip-jejak-api/internal/repository"
+	"titip-jejak-api/internal/router"
+	"titip-jejak-api/internal/service"
+	"titip-jejak-api/internal/usecase"
+	"titip-jejak-api/internal/worker"
 )
 
 // Injectors from wire.go:

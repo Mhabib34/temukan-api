@@ -3,11 +3,11 @@ package usecase
 import (
 	"context"
 	"fmt"
-	"temukan-api/internal/dto"
-	"temukan-api/internal/exception"
-	"temukan-api/internal/helper"
-	"temukan-api/internal/model"
-	"temukan-api/internal/repository"
+	"titip-jejak-api/internal/dto"
+	"titip-jejak-api/internal/exception"
+	"titip-jejak-api/internal/helper"
+	"titip-jejak-api/internal/model"
+	"titip-jejak-api/internal/repository"
 
 	"github.com/go-playground/validator/v10"
 	"github.com/google/uuid"

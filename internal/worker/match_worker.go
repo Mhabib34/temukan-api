@@ -2,10 +2,10 @@ package worker
 
 import (
 	"context"
-	"temukan-api/internal/logger"
-	"temukan-api/internal/model"
-	"temukan-api/internal/repository"
-	"temukan-api/internal/service"
+	"titip-jejak-api/internal/logger"
+	"titip-jejak-api/internal/model"
+	"titip-jejak-api/internal/repository"
+	"titip-jejak-api/internal/service"
 
 	"github.com/google/uuid"
 	"golang.org/x/sync/errgroup"

@@ -1,7 +1,7 @@
 package middleware
 
 import (
-	"temukan-api/internal/exception"
+	"titip-jejak-api/internal/exception"
 
 	"github.com/gin-gonic/gin"
 )

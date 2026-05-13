@@ -3,7 +3,7 @@ package usecase
 import (
 	"context"
 	"mime/multipart"
-	"temukan-api/internal/dto"
+	"titip-jejak-api/internal/dto"
 
 	"github.com/google/uuid"
 )

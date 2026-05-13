@@ -2,10 +2,10 @@ package usecase
 
 import (
 	"context"
-	"temukan-api/internal/dto"
-	"temukan-api/internal/exception"
-	"temukan-api/internal/helper"
-	"temukan-api/internal/repository"
+	"titip-jejak-api/internal/dto"
+	"titip-jejak-api/internal/exception"
+	"titip-jejak-api/internal/helper"
+	"titip-jejak-api/internal/repository"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"

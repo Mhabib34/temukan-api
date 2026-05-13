@@ -3,7 +3,7 @@ package service
 import (
 	"context"
 	"fmt"
-	"temukan-api/internal/model"
+	"titip-jejak-api/internal/model"
 
 	"github.com/resend/resend-go/v2"
 )

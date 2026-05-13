@@ -1,7 +1,7 @@
 package dto
 
 import (
-	"temukan-api/internal/model"
+	"titip-jejak-api/internal/model"
 	"time"
 
 	"github.com/google/uuid"

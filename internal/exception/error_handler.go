@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"io"
 	"net/http"
-	"temukan-api/internal/dto"
-	"temukan-api/internal/helper"
+	"titip-jejak-api/internal/dto"
+	"titip-jejak-api/internal/helper"
 
 	"github.com/gin-gonic/gin"
 	"github.com/go-playground/validator/v10"

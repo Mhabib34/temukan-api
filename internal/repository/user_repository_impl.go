@@ -2,8 +2,8 @@ package repository
 
 import (
 	"context"
-	"temukan-api/internal/exception"
-	"temukan-api/internal/model"
+	"titip-jejak-api/internal/exception"
+	"titip-jejak-api/internal/model"
 
 	"github.com/google/uuid"
 	"gorm.io/gorm"
