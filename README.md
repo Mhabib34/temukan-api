@@ -1,11 +1,11 @@
-# TemuKan — API (Backend)
+# Titip Jejak — API (Backend)
 
-> **EN** | REST API backend for the TemuKan missing persons platform.  
-> **ID** | Backend REST API untuk platform pencarian orang hilang TemuKan.
+> **EN** | REST API backend for the Titip Jejak missing persons platform.  
+> **ID** | Backend REST API untuk platform pencarian orang hilang Titip Jejak.
 
 [![License: AGPL-3.0](https://img.shields.io/badge/License-AGPL%20v3-orange.svg)](https://www.gnu.org/licenses/agpl-3.0)
 [![Go](https://img.shields.io/badge/Go-1.21+-00ADD8?logo=go&logoColor=white)](https://go.dev)
-[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/Mhabib34/temukan-api/blob/main/CONTRIBUTING.md)
+[![PRs Welcome](https://img.shields.io/badge/PRs-welcome-brightgreen.svg)](https://github.com/Mhabib34/titip-jejak-api/blob/main/CONTRIBUTING.md)
 
 ---
 
@@ -13,7 +13,7 @@
 
 ### Overview
 
-This is the backend API for [TemuKan](https://github.com/Mhabib34/temukan-web), handling:
+This is the backend API for [Titip Jejak](https://github.com/Mhabib34/titip-jejak-web), handling:
 
 - Authentication (via Supabase Auth)
 - Missing persons report CRUD
@@ -23,10 +23,10 @@ This is the backend API for [TemuKan](https://github.com/Mhabib34/temukan-web), 
 
 ### Repositories
 
-| Repo                                                     | Description                  |
-| -------------------------------------------------------- | ---------------------------- |
-| [`temukan-web`](https://github.com/Mhabib34/temukan-web) | Next.js frontend             |
-| [`temukan-api`](https://github.com/Mhabib34/temukan-api) | This repo — REST API backend |
+| Repo                                                             | Description                  |
+| ---------------------------------------------------------------- | ---------------------------- |
+| [`titip-jejak-web`](https://github.com/Mhabib34/titip-jejak-web) | Next.js frontend             |
+| [`titip-jejak-api`](https://github.com/Mhabib34/titip-jejak-api) | This repo — REST API backend |
 
 ### Tech Stack
 
@@ -44,8 +44,8 @@ This is the backend API for [TemuKan](https://github.com/Mhabib34/temukan-web), 
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/Mhabib34/temukan-api.git
-cd temukan-api
+git clone https://github.com/Mhabib34/titip-jejak-api.git
+cd titip-jejak-api
 
 # 2. Install dependencies
 go mod tidy
@@ -61,8 +61,8 @@ go run ./cmd/api/main.go
 #### Build for Production
 
 ```bash
-go build -o temukan-api ./cmd/api/main.go
-./temukan-api
+go build -o titip-jejak-api ./cmd/api/main.go
+./titip-jejak-api
 ```
 
 #### Environment Variables
@@ -92,14 +92,14 @@ See [LICENSE](./LICENSE) for details.
 
 ### Gambaran Umum
 
-Ini adalah backend API untuk [TemuKan](https://github.com/Mhabib34/temukan-web), menangani autentikasi, laporan orang hilang, logika pencocokan antar laporan, manajemen relawan, dan endpoint statistik.
+Ini adalah backend API untuk [Titip Jejak](https://github.com/Mhabib34/titip-jejak-web), menangani autentikasi, laporan orang hilang, logika pencocokan antar laporan, manajemen relawan, dan endpoint statistik.
 
 ### Cara Menjalankan Secara Lokal
 
 ```bash
 # 1. Clone repo
-git clone https://github.com/Mhabib34/temukan-api.git
-cd temukan-api
+git clone https://github.com/Mhabib34/titip-jejak-api.git
+cd titip-jejak-api
 
 # 2. Install dependensi
 go mod tidy
@@ -114,8 +114,8 @@ go run ./cmd/api/main.go
 #### Build Production
 
 ```bash
-go build -o temukan-api ./cmd/api/main.go
-./temukan-api
+go build -o titip-jejak-api ./cmd/api/main.go
+./titip-jejak-api
 ```
 
 ### Lisensi

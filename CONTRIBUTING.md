@@ -1,7 +1,7 @@
-# Contributing to TemuKan
+# Contributing to Titip Jejak
 
-Thank you for your interest in contributing to TemuKan! 🧡  
-Terima kasih sudah tertarik untuk berkontribusi ke TemuKan! 🧡
+Thank you for your interest in contributing to Titip Jejak! 🧡  
+Terima kasih sudah tertarik untuk berkontribusi ke Titip Jejak! 🧡
 
 ---
 
